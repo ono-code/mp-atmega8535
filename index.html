@@ -1,0 +1,2278 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoboAVR Lab — Media Pembelajaran Interaktif ATmega8535 & BASCOM-AVR</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Tone.js untuk Efek Suara Sintetis Tanpa File Eksternal -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        avr: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Kustomisasi scrollbar dan animasi halus */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .chip-pin {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .chip-pin:hover {
+            transform: scale(1.08);
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(14, 165, 233, 0); }
+        }
+        .animate-pulse-glow {
+            animation: pulseGlow 2s infinite;
+        }
+
+        /* Gaya khusus grid Teka-Teki Silang */
+        .cw-cell {
+            aspect-ratio: 1 / 1;
+            text-transform: uppercase;
+            caret-color: #0284c7;
+        }
+        .cw-cell:focus {
+            outline: none;
+            background-color: #e0f2fe;
+            box-shadow: inset 0 0 0 2px #0284c7;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-sky-500 selection:text-white min-h-screen flex flex-col">
+
+    <!-- Toast Notification Container (Pengganti alert) -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- Custom Modal Dialog (Pengganti confirm/prompt) -->
+    <div id="custom-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200 transform transition-all">
+            <div class="flex items-center gap-3 mb-3">
+                <div id="modal-icon" class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <h3 id="modal-title" class="text-lg font-bold text-slate-900">Judul Modal</h3>
+            </div>
+            <p id="modal-body" class="text-slate-600 text-sm leading-relaxed mb-5">Isi pesan modal.</p>
+            <div id="modal-input-wrap" class="hidden mb-5">
+                <input type="text" id="modal-input" placeholder="Masukkan nama lengkap siswa..." class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 outline-none text-sm font-medium">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button id="modal-cancel" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition">Batal</button>
+                <button id="modal-confirm" class="px-5 py-2 rounded-xl text-sm font-semibold bg-sky-600 text-white hover:bg-sky-700 shadow-sm transition">Konfirmasi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header & Navigasi Utama -->
+    <header class="bg-slate-900 text-white sticky top-0 z-40 border-b border-slate-800 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo & Identitas Jurusan TEI -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/20">
+                        <i class="fa-solid fa-microchip text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-extrabold text-lg tracking-tight">RoboAVR<span class="text-sky-400">Lab</span></span>
+                            <span class="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">SMK • TEI</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400 hidden sm:block">Pemrograman ATmega8535 & BASCOM-AVR</p>
+                    </div>
+                </div>
+
+                <!-- Status Siswa, Skor XP & Audio Toggle -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <button onclick="openStudentModal()" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl border border-slate-700 transition text-xs sm:text-sm">
+                        <i class="fa-solid fa-user-graduate text-sky-400"></i>
+                        <span id="student-name-display" class="font-semibold text-slate-200 max-w-[90px] sm:max-w-[140px] truncate">Siswa TEI</span>
+                    </button>
+
+                    <div class="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-xl">
+                        <i class="fa-solid fa-bolt text-amber-400 text-xs"></i>
+                        <span id="xp-display" class="font-mono font-bold text-amber-300 text-xs sm:text-sm">0 XP</span>
+                    </div>
+
+                    <button id="audio-toggle" onclick="toggleAudio()" title="Suara Efek" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-slate-300 transition">
+                        <i id="audio-icon" class="fa-solid fa-volume-high text-sky-400"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Menu Tab Navigasi -->
+            <nav class="flex overflow-x-auto no-scrollbar gap-1 pb-2 pt-1">
+                <button onclick="switchTab('beranda')" data-tab="beranda" class="nav-btn active flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition bg-sky-600 text-white shadow-sm">
+                    <i class="fa-solid fa-compass"></i> Beranda
+                </button>
+                <button onclick="switchTab('teori')" data-tab="teori" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-800 hover:text-white">
+                    <i class="fa-solid fa-book-open"></i> Teori & Pinout
+                </button>
+                <button onclick="switchTab('dokumentasi')" data-tab="dokumentasi" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-800 hover:text-white">
+                    <i class="fa-solid fa-code"></i> Dokumentasi BASCOM
+                </button>
+                <button onclick="switchTab('simulator')" data-tab="simulator" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-800 hover:text-white">
+                    <i class="fa-solid fa-robot"></i> Simulator Robot
+                </button>
+                <button onclick="switchTab('puzzle')" data-tab="puzzle" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-800 hover:text-white">
+                    <i class="fa-solid fa-puzzle-piece text-amber-400"></i> Arena 5 Puzzle
+                    <span id="puzzle-badge-count" class="text-[11px] bg-amber-500 text-slate-950 font-extrabold px-1.5 py-0.2 rounded-full">0/5</span>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Konten Utama -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ===================================================================== -->
+        <!-- TAB 1: BERANDA & DASHBOARD PEMBELAJARAN                               -->
+        <!-- ===================================================================== -->
+        <section id="tab-beranda" class="tab-content space-y-6">
+            <!-- Hero Banner -->
+            <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-sky-950 text-white p-6 sm:p-10 shadow-xl border border-slate-700/60">
+                <div class="relative z-10 max-w-3xl">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-300 text-xs font-semibold mb-4">
+                        <i class="fa-solid fa-graduation-cap"></i> Kompetensi Keahlian Teknik Elektronika Industri
+                    </div>
+                    <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight mb-3">
+                        Kuasai Pemrograman <span class="text-sky-400">ATmega8535</span> & <span class="text-amber-400">BASCOM-AVR</span> untuk Kendali Robotika!
+                    </h1>
+                    <p class="text-slate-300 text-sm sm:text-base leading-relaxed mb-6">
+                        Selamat datang di laboratorium pembelajaran interaktif. Pelajari arsitektur perangkat keras mikrokontroler, kuasai sintaks bahasa BASIC pada BASCOM-AVR, uji logika robot Line Follower pada simulator, dan taklukkan 5 tantangan puzzle rekayasa!
+                    </p>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="switchTab('teori')" class="px-5 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm transition flex items-center gap-2 shadow-lg shadow-sky-500/25">
+                            <i class="fa-solid fa-play"></i> Mulai Belajar Teori
+                        </button>
+                        <button onclick="switchTab('puzzle')" class="px-5 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-sm transition flex items-center gap-2 shadow-lg shadow-amber-400/20">
+                            <i class="fa-solid fa-gamepad"></i> Mainkan 5 Game Puzzle
+                        </button>
+                        <button onclick="switchTab('simulator')" class="px-5 py-3 rounded-xl bg-slate-700/80 hover:bg-slate-700 text-white font-semibold text-sm border border-slate-600 transition flex items-center gap-2">
+                            <i class="fa-solid fa-microchip"></i> Buka Simulator Robot
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dekorasi Chip SVG di Sisi Kanan -->
+                <div class="hidden lg:flex absolute right-8 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none">
+                    <i class="fa-solid fa-microchip text-[220px] text-sky-400"></i>
+                </div>
+            </div>
+
+            <!-- Kartu Statistik Progres Belajar -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-book-bookmark"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">Modul Teori</p>
+                        <p class="text-xl font-extrabold text-slate-900">4 Bab Lengkap</p>
+                        <p class="text-xs text-slate-500">Pinout, I/O, ADC & PWM</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-terminal"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">Kamus Sintaks</p>
+                        <p class="text-xl font-extrabold text-slate-900">16+ Perintah</p>
+                        <p class="text-xs text-slate-500">Siap salin & contoh kode</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-puzzle-piece"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">Puzzle Selesai</p>
+                        <p id="dash-puzzle-stat" class="text-xl font-extrabold text-slate-900">0 / 5 Arena</p>
+                        <p class="text-xs text-slate-500">Kumpulkan hingga 500 XP</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-award"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">Peringkat Siswa</p>
+                        <p id="dash-rank-stat" class="text-xl font-extrabold text-slate-900">Taruna Pemula</p>
+                        <button onclick="confirmResetProgress()" class="text-xs text-rose-500 hover:underline font-medium">Reset Progres</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alur Pembelajaran Terstruktur (Roadmap SMK) -->
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">Peta Alur Pembelajaran Robotika AVR</h2>
+                        <p class="text-sm text-slate-500">Ikuti tahapan berikut agar pemahaman perangkat keras dan perangkat lunak menyatu secara utuh.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div onclick="switchTab('teori')" class="cursor-pointer group p-5 rounded-2xl border border-slate-200 hover:border-sky-500 hover:bg-sky-50/40 transition">
+                        <span class="inline-block px-2.5 py-1 rounded-lg bg-sky-100 text-sky-700 font-mono text-xs font-bold mb-3">TAHAP 01</span>
+                        <h3 class="font-bold text-slate-900 group-hover:text-sky-700 mb-1">Arsitektur & Pinout</h3>
+                        <p class="text-xs text-slate-600 leading-relaxed">Kenali fungsi 40 pin DIP ATmega8535, Port A-D, saluran ADC, dan pin PWM Timer1.</p>
+                    </div>
+
+                    <div onclick="switchTab('dokumentasi')" class="cursor-pointer group p-5 rounded-2xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition">
+                        <span class="inline-block px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 font-mono text-xs font-bold mb-3">TAHAP 02</span>
+                        <h3 class="font-bold text-slate-900 group-hover:text-emerald-700 mb-1">Sintaks BASCOM-AVR</h3>
+                        <p class="text-xs text-slate-600 leading-relaxed">Pahami direktif kompiler, konfigurasi register DDR/PORT/PIN, serta struktur percabangan.</p>
+                    </div>
+
+                    <div onclick="switchTab('simulator')" class="cursor-pointer group p-5 rounded-2xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/40 transition">
+                        <span class="inline-block px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-700 font-mono text-xs font-bold mb-3">TAHAP 03</span>
+                        <h3 class="font-bold text-slate-900 group-hover:text-indigo-700 mb-1">Simulasi Robotika</h3>
+                        <p class="text-xs text-slate-600 leading-relaxed">Amati bagaimana pembacaan sensor garis mengendalikan motor DC melalui driver L298N.</p>
+                    </div>
+
+                    <div onclick="switchTab('puzzle')" class="cursor-pointer group p-5 rounded-2xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50/40 transition">
+                        <span class="inline-block px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 font-mono text-xs font-bold mb-3">TAHAP 04</span>
+                        <h3 class="font-bold text-slate-900 group-hover:text-amber-700 mb-1">Evaluasi 5 Puzzle</h3>
+                        <p class="text-xs text-slate-600 leading-relaxed">Uji ketajaman logika melalui puzzle kode, pinout, register biner, navigasi, dan TTS.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================================================================== -->
+        <!-- TAB 2: TEORI MENDALAM & DIAGRAM PINOUT INTERAKTIF                     -->
+        <!-- ===================================================================== -->
+        <section id="tab-teori" class="tab-content hidden space-y-6">
+            <!-- Sub-navigasi Bab Teori -->
+            <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-2">
+                <button onclick="switchTheoryChapter(1)" data-ch="1" class="ch-btn active px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-sky-600 text-white transition">
+                    Bab 1: Arsitektur & Pinout ATmega8535
+                </button>
+                <button onclick="switchTheoryChapter(2)" data-ch="2" class="ch-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+                    Bab 2: Dasar BASCOM-AVR & Port I/O
+                </button>
+                <button onclick="switchTheoryChapter(3)" data-ch="3" class="ch-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+                    Bab 3: Sensor Robot & ADC
+                </button>
+                <button onclick="switchTheoryChapter(4)" data-ch="4" class="ch-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+                    Bab 4: Kendali Motor DC, L298N & PWM
+                </button>
+            </div>
+
+            <!-- BAB 1: ARSITEKTUR & PINOUT INTERAKTIF -->
+            <div id="theory-ch-1" class="theory-chapter space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Penjelasan Teori Arsitektur -->
+                    <div class="lg:col-span-5 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                        <span class="inline-block px-3 py-1 rounded-full bg-sky-100 text-sky-700 text-xs font-bold">ARSITEKTUR RISC 8-BIT</span>
+                        <h2 class="text-2xl font-extrabold text-slate-900">Mikrokontroler AVR ATmega8535</h2>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            <strong>ATmega8535</strong> adalah mikrokontroler CMOS 8-bit berdaya rendah berbasis arsitektur <em>AVR Enhanced RISC</em>. Karena kemampuannya mengeksekusi hampir satu instruksi per siklus clock (hingga 16 MIPS pada kristal 16 MHz), IC ini menjadi standar utama praktikum kendali robotika di SMK Teknik Elektronika Industri.
+                        </p>
+
+                        <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-2.5">
+                            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-microchip text-sky-600"></i> Spesifikasi Utama Perangkat Keras:
+                            </h4>
+                            <ul class="text-xs text-slate-600 space-y-2">
+                                <li class="flex items-start gap-2"><i class="fa-solid fa-check text-emerald-500 mt-0.5"></i> <span><strong>Memori Program:</strong> 8 KB In-System Programmable Flash (tempat menyimpan file <code>.hex</code> hasil kompilasi BASCOM-AVR).</span></li>
+                                <li class="flex items-start gap-2"><i class="fa-solid fa-check text-emerald-500 mt-0.5"></i> <span><strong>Memori Data:</strong> 512 Byte SRAM (untuk variabel saat program berjalan) & 512 Byte EEPROM (penyimpanan permanen).</span></li>
+                                <li class="flex items-start gap-2"><i class="fa-solid fa-check text-emerald-500 mt-0.5"></i> <span><strong>32 Jalur I/O Terprogram:</strong> Terbagi menjadi 4 Port 8-bit yaitu <code>PORTA</code>, <code>PORTB</code>, <code>PORTC</code>, dan <code>PORTD</code>.</span></li>
+                                <li class="flex items-start gap-2"><i class="fa-solid fa-check text-emerald-500 mt-0.5"></i> <span><strong>ADC Internal:</strong> 8 kanal ADC 10-bit (resolusi 0–1023) terintegrasi pada <code>PORTA</code> (Pin 33–40).</span></li>
+                                <li class="flex items-start gap-2"><i class="fa-solid fa-check text-emerald-500 mt-0.5"></i> <span><strong>Timer & PWM:</strong> Dua Timer/Counter 8-bit (Timer0, Timer2) dan satu Timer/Counter 16-bit (Timer1 dengan output PWM <code>OC1A</code> & <code>OC1B</code>).</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- Kartu Detail Pin yang Diklik -->
+                        <div id="pin-inspector-card" class="rounded-2xl bg-slate-900 text-white p-5 border border-slate-700 shadow-md">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-mono uppercase tracking-wider text-sky-400">Inspektor Pin Interaktif</span>
+                                <span id="insp-pin-num" class="px-2.5 py-0.5 rounded-md bg-sky-500/20 text-sky-300 font-mono text-xs font-bold">PIN 40</span>
+                            </div>
+                            <h3 id="insp-pin-name" class="text-lg font-extrabold text-white mb-1">PA0 (ADC0)</h3>
+                            <p id="insp-pin-role" class="text-xs text-amber-300 font-semibold mb-2">Port A Bit 0 / Input Analog Kanal 0</p>
+                            <p id="insp-pin-desc" class="text-xs text-slate-300 leading-relaxed">
+                                Klik salah satu dari 40 kaki pin pada gambar IC ATmega8535 di samping untuk melihat fungsi elektronika dan penerapannya pada robot!
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Diagram Chip ATmega8535 DIP-40 Interaktif -->
+                    <div class="lg:col-span-7 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+                        <div class="text-center mb-4">
+                            <h3 class="font-bold text-slate-900 text-base">Diagram Pinout ATmega8535 (Kemasan DIP-40)</h3>
+                            <p class="text-xs text-slate-500">Klik pin mana saja untuk menginspeksi fungsi & perannya dalam robotika</p>
+                        </div>
+
+                        <div class="w-full overflow-x-auto py-2">
+                            <div id="interactive-chip-container" class="min-w-[520px] max-w-[600px] mx-auto bg-slate-900 rounded-2xl p-4 sm:p-6 border-2 border-slate-700 shadow-inner">
+                                <!-- Di-render secara dinamis via JavaScript agar presisi 40 pin -->
+                            </div>
+                        </div>
+
+                        <!-- Legenda Warna Pin -->
+                        <div class="flex flex-wrap justify-center gap-3 mt-4 text-[11px] font-semibold">
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-rose-500"></span> Power/Reset/XTAL</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-amber-500"></span> Port A (ADC Sensor)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-emerald-500"></span> Port B (I/O & SPI)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-indigo-500"></span> Port C (I/O & TWI)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-sky-500"></span> Port D (PWM & UART)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BAB 2: DASAR PEMROGRAMAN BASCOM-AVR & REGISTER I/O -->
+            <div id="theory-ch-2" class="theory-chapter hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                        <span class="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">STRUKTUR & REGISTER I/O</span>
+                        <h2 class="text-2xl font-extrabold text-slate-900">Anatomi Program BASCOM-AVR</h2>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            <strong>BASCOM-AVR</strong> menggunakan sintaks bahasa BASIC yang terstruktur dan mudah dipahami. Setiap program kendali robot memiliki 3 bagian wajib: <em>Header Direktif</em>, <em>Inisialisasi I/O & Variabel</em>, serta <em>Program Utama (Main Loop)</em>.
+                        </p>
+
+                        <div class="space-y-3">
+                            <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200">
+                                <h4 class="font-bold text-amber-900 text-sm mb-1"><i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Aturan Emas PORTx vs PINx (Sering Keliru!)</h4>
+                                <ul class="text-xs text-amber-900/90 space-y-1.5 leading-relaxed">
+                                    <li><strong>1. Menentukan Arah (Input/Output):</strong> Gunakan <code>Config Portb = Output</code> atau register <code>DDRB = &B11111111</code> (1 = Output, 0 = Input).</li>
+                                    <li><strong>2. Mengirim Data Keluaran (Output):</strong> Gunakan kata kunci <code>PORT</code>. Contoh: <code>Portb.0 = 1</code> (menyalakan aktuator/LED pada PB0).</li>
+                                    <li><strong>3. Membaca Data Masukan (Input):</strong> Gunakan kata kunci <code>PIN</code>! Contoh: <code>If Pina.0 = 0 Then...</code> (membaca tombol atau sensor digital pada PA0).</li>
+                                    <li><strong>4. Resistor Pull-Up Internal:</strong> Saat pin menjadi Input, aktifkan pull-up dengan <code>Porta = &B11111111</code> agar logika tidak mengambang (<em>floating</em>).</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contoh Kode Lengkap Berkomentar -->
+                    <div class="bg-slate-900 rounded-3xl p-6 text-slate-100 border border-slate-800 shadow-lg flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-mono text-emerald-400 font-bold"><i class="fa-solid fa-file-code"></i> dasar_io_robot.bas</span>
+                                <button onclick="copyCodeBlock('code-bab2')" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                                    <i class="fa-regular fa-copy"></i> Salin Kode
+                                </button>
+                            </div>
+                            <pre id="code-bab2" class="font-mono text-xs sm:text-[13px] leading-relaxed overflow-x-auto text-sky-100 bg-slate-950/70 p-4 rounded-2xl border border-slate-800"><code><span class="text-slate-400">' 1. BAGIAN HEADER DIREKTIF KOMPILER</span>
+<span class="text-amber-400">$regfile</span> = <span class="text-emerald-300">"m8535.dat"</span>      <span class="text-slate-400">' Gunakan pustaka IC ATmega8535</span>
+<span class="text-amber-400">$crystal</span> = <span class="text-purple-300">16000000</span>         <span class="text-slate-400">' Frekuensi kristal eksternal 16 MHz</span>
+
+<span class="text-slate-400">' 2. KONFIGURASI ARAH PORT I/O</span>
+<span class="text-sky-400">Config Porta</span> = <span class="text-rose-400">Input</span>        <span class="text-slate-400">' Port A sebagai input sensor/tombol</span>
+<span class="text-sky-400">Config Portb</span> = <span class="text-rose-400">Output</span>       <span class="text-slate-400">' Port B sebagai output LED/aktuator</span>
+<span class="text-sky-400">Porta</span> = &amp;B11111111          <span class="text-slate-400">' Aktifkan internal pull-up Port A</span>
+
+<span class="text-slate-400">' 3. DEKLARASI ALIAS PIN AGAR MUDAH DIBACA</span>
+Tombol_start <span class="text-sky-400">Alias</span> Pina.0   <span class="text-slate-400">' Baca input pakai PINA.0</span>
+Led_indikator <span class="text-sky-400">Alias</span> Portb.0 <span class="text-slate-400">' Tulis output pakai PORTB.0</span>
+
+<span class="text-slate-400">' 4. PROGRAM UTAMA (PERULANGAN ABADI)</span>
+<span class="text-sky-400">Do</span>
+   <span class="text-sky-400">If</span> Tombol_start = 0 <span class="text-sky-400">Then</span> <span class="text-slate-400">' Tombol aktif rendah (Active Low)</span>
+      Led_indikator = 1     <span class="text-slate-400">' Nyalakan LED (Logika HIGH / +5V)</span>
+      <span class="text-sky-400">Waitms</span> 200            <span class="text-slate-400">' Tunda 200 milidetik</span>
+   <span class="text-sky-400">Else</span>
+      Led_indikator = 0     <span class="text-slate-400">' Matikan LED (Logika LOW / 0V)</span>
+   <span class="text-sky-400">End If</span>
+<span class="text-sky-400">Loop</span>
+<span class="text-sky-400">End</span></code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BAB 3: SENSOR ROBOTIKA & ADC -->
+            <div id="theory-ch-3" class="theory-chapter hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                        <span class="inline-block px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">AKUSISI DATA SENSOR</span>
+                        <h2 class="text-2xl font-extrabold text-slate-900">Sensor Garis Inframerah & ADC 10-Bit</h2>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Robot <em>Line Follower</em> menggunakan pasangan <strong>LED Superbright / Inframerah</strong> dan <strong>Photodiode</strong> untuk membedakan pantulan cahaya lantai putih dan garis hitam. Tegangan analog dari sensor masuk ke pin <code>PORTA.0</code> s.d. <code>PORTA.7</code> untuk diubah menjadi angka digital oleh modul <strong>ADC (Analog-to-Digital Converter)</strong>.
+                        </p>
+
+                        <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-2">
+                            <h4 class="font-bold text-slate-800 text-sm">Rumus Konversi ADC 10-Bit (Vref = 5V):</h4>
+                            <div class="bg-white p-3 rounded-xl border border-slate-200 font-mono text-xs text-center text-sky-700 font-bold">
+                                Nilai ADC = (Vin / 5.0 Volt) × 1023
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 pt-2 text-xs">
+                                <div class="p-3 rounded-xl bg-white border border-slate-200">
+                                    <span class="font-bold text-slate-900 block">Lantai Putih (Pantulan Kuat)</span>
+                                    <span class="text-slate-500">Photodiode menghantar → Vin rendah (±0.6V) → <strong>ADC ≈ 120</strong></span>
+                                </div>
+                                <div class="p-3 rounded-xl bg-slate-900 text-white">
+                                    <span class="font-bold text-amber-400 block">Garis Hitam (Cahaya Diserap)</span>
+                                    <span class="text-slate-300">Photodiode menahan → Vin tinggi (±4.2V) → <strong>ADC ≈ 860</strong></span>
+                                </div>
+                            </div>
+                            <p class="text-xs text-slate-600 pt-1">
+                                Dengan nilai ambang batas (<em>threshold</em>) misalnya <code>500</code>, program dapat memutuskan secara akurat apakah sensor menyentuh garis hitam (<code>Nilai_adc &gt; 500</code>) atau lantai putih!
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 rounded-3xl p-6 text-slate-100 border border-slate-800 shadow-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-mono text-indigo-400 font-bold"><i class="fa-solid fa-wave-square"></i> baca_sensor_adc.bas</span>
+                            <button onclick="copyCodeBlock('code-bab3')" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                                <i class="fa-regular fa-copy"></i> Salin Kode
+                            </button>
+                        </div>
+                        <pre id="code-bab3" class="font-mono text-xs sm:text-[13px] leading-relaxed overflow-x-auto text-sky-100 bg-slate-950/70 p-4 rounded-2xl border border-slate-800"><code><span class="text-amber-400">$regfile</span> = <span class="text-emerald-300">"m8535.dat"</span>
+<span class="text-amber-400">$crystal</span> = <span class="text-purple-300">16000000</span>
+
+<span class="text-slate-400">' Konfigurasi Modul ADC Internal</span>
+<span class="text-sky-400">Config Adc</span> = <span class="text-rose-400">Single</span> , <span class="text-rose-400">Prescaler</span> = <span class="text-rose-400">Auto</span> , <span class="text-rose-400">Reference</span> = <span class="text-rose-400">Avcc</span>
+<span class="text-sky-400">Start Adc</span>                   <span class="text-slate-400">' Aktifkan periferal ADC</span>
+
+<span class="text-sky-400">Config Portb</span> = <span class="text-rose-400">Output</span>       <span class="text-slate-400">' Indikator LED hasil pembacaan</span>
+
+<span class="text-slate-400">' Variabel Word (0 s.d. 65535) wajib untuk ADC 10-bit (0-1023)</span>
+<span class="text-sky-400">Dim</span> Sensor_kiri <span class="text-sky-400">As Word</span>
+<span class="text-sky-400">Dim</span> Sensor_kanan <span class="text-sky-400">As Word</span>
+
+<span class="text-sky-400">Do</span>
+   Sensor_kiri = <span class="text-amber-300">Getadc</span>(0)  <span class="text-slate-400">' Baca tegangan analog pada PA0</span>
+   Sensor_kanan = <span class="text-amber-300">Getadc</span>(1) <span class="text-slate-400">' Baca tegangan analog pada PA1</span>
+
+   <span class="text-slate-400">' Bandingkan dengan nilai ambang (Threshold = 500)</span>
+   <span class="text-sky-400">If</span> Sensor_kiri &gt; 500 <span class="text-sky-400">Then</span>
+      Portb.0 = 1           <span class="text-slate-400">' Sensor kiri mendeteksi garis hitam</span>
+   <span class="text-sky-400">Else</span>
+      Portb.0 = 0           <span class="text-slate-400">' Sensor kiri di atas lantai putih</span>
+   <span class="text-sky-400">End If</span>
+<span class="text-sky-400">Loop</span>
+<span class="text-sky-400">End</span></code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BAB 4: KENDALI AKTUATOR MOTOR DC & PWM -->
+            <div id="theory-ch-4" class="theory-chapter hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                        <span class="inline-block px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">AKTUATOR & MODULASI LEBAR PULSA</span>
+                        <h2 class="text-2xl font-extrabold text-slate-900">Driver Motor L298N & PWM Timer1</h2>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Pin mikrokontroler ATmega8535 hanya mampu menyuplai arus maksimal ±20 mA, sehingga tidak boleh dihubungkan langsung ke motor DC. Kita menggunakan IC <strong>Driver H-Bridge L298N</strong> untuk mengatur arah putaran (<em>Clockwise / Counter-Clockwise</em>) dan sinyal <strong>PWM (Pulse Width Modulation)</strong> pada pin <code>PD5 (OC1A)</code> dan <code>PD4 (OC1B)</code> untuk mengatur kecepatan putaran motor.
+                        </p>
+
+                        <!-- Tabel Kebenaran L298N -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs text-left border-collapse rounded-xl overflow-hidden border border-slate-200">
+                                <thead class="bg-slate-800 text-white">
+                                    <tr>
+                                        <th class="p-2.5">ENA (PWM)</th>
+                                        <th class="p-2.5">IN1</th>
+                                        <th class="p-2.5">IN2</th>
+                                        <th class="p-2.5">Kondisi Motor DC</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 bg-white">
+                                    <tr>
+                                        <td class="p-2.5 font-mono text-sky-600 font-bold">1 - 255</td>
+                                        <td class="p-2.5 font-mono">1</td>
+                                        <td class="p-2.5 font-mono">0</td>
+                                        <td class="p-2.5 font-semibold text-emerald-700">Berputar Maju (CW)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-2.5 font-mono text-sky-600 font-bold">1 - 255</td>
+                                        <td class="p-2.5 font-mono">0</td>
+                                        <td class="p-2.5 font-mono">1</td>
+                                        <td class="p-2.5 font-semibold text-amber-700">Berputar Mundur (CCW)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-2.5 font-mono text-slate-400">0 / X</td>
+                                        <td class="p-2.5 font-mono">0</td>
+                                        <td class="p-2.5 font-mono">0</td>
+                                        <td class="p-2.5 font-semibold text-slate-500">Berhenti Bebas (Stop)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-2.5 font-mono text-sky-600 font-bold">255</td>
+                                        <td class="p-2.5 font-mono">1</td>
+                                        <td class="p-2.5 font-mono">1</td>
+                                        <td class="p-2.5 font-semibold text-rose-600">Rem Aktif (Fast Brake)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 rounded-3xl p-6 text-slate-100 border border-slate-800 shadow-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-mono text-rose-400 font-bold"><i class="fa-solid fa-gauge-high"></i> kendali_pwm_motor.bas</span>
+                            <button onclick="copyCodeBlock('code-bab4')" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                                <i class="fa-regular fa-copy"></i> Salin Kode
+                            </button>
+                        </div>
+                        <pre id="code-bab4" class="font-mono text-xs sm:text-[13px] leading-relaxed overflow-x-auto text-sky-100 bg-slate-950/70 p-4 rounded-2xl border border-slate-800"><code><span class="text-amber-400">$regfile</span> = <span class="text-emerald-300">"m8535.dat"</span>
+<span class="text-amber-400">$crystal</span> = <span class="text-purple-300">16000000</span>
+
+<span class="text-slate-400">' Konfigurasi Timer1 sebagai Pembangkit PWM 8-Bit (0 - 255)</span>
+<span class="text-slate-400">' Output otomatis keluar di PD5 (OC1A) dan PD4 (OC1B)</span>
+<span class="text-sky-400">Config Timer1</span> = <span class="text-rose-400">Pwm</span> , <span class="text-rose-400">Pwm</span> = 8 , <span class="text-rose-400">Compare A Pwm</span> = <span class="text-rose-400">Clear Up</span> , <span class="text-rose-400">Compare B Pwm</span> = <span class="text-rose-400">Clear Up</span> , <span class="text-rose-400">Prescale</span> = 64
+
+<span class="text-sky-400">Config Portb</span> = <span class="text-rose-400">Output</span>       <span class="text-slate-400">' PB0..PB3 ke pin IN1..IN4 Driver L298N</span>
+
+<span class="text-sky-400">Do</span>
+   <span class="text-slate-400">' Gerak Maju Kecepatan Sedang (Duty Cycle ~78% -> 200/255)</span>
+   Portb = &amp;B00001010       <span class="text-slate-400">' Motor Kiri Maju (10), Motor Kanan Maju (10)</span>
+   <span class="text-amber-300">Pwm1a</span> = 200              <span class="text-slate-400">' Kecepatan Motor Kiri (Pin PD5)</span>
+   <span class="text-amber-300">Pwm1b</span> = 200              <span class="text-slate-400">' Kecepatan Motor Kanan (Pin PD4)</span>
+   <span class="text-sky-400">Wait</span> 2
+
+   <span class="text-slate-400">' Belok Kanan Tajam (Kiri Cepat, Kanan Pelan/Stop)</span>
+   <span class="text-amber-300">Pwm1a</span> = 220
+   <span class="text-amber-300">Pwm1b</span> = 60
+   <span class="text-sky-400">Wait</span> 1
+<span class="text-sky-400">Loop</span>
+<span class="text-sky-400">End</span></code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================================================================== -->
+        <!-- TAB 3: DOKUMENTASI REFERENSI SINTAKS BASCOM-AVR (SEARCHABLE)          -->
+        <!-- ===================================================================== -->
+        <section id="tab-dokumentasi" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <span class="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold mb-2">REFERENSI RESMI PRAKTIKUM</span>
+                        <h2 class="text-2xl font-extrabold text-slate-900">Dokumentasi Perintah BASCOM-AVR</h2>
+                        <p class="text-sm text-slate-500">Cari sintaks, tipe data, direktif, atau fungsi perangkat keras beserta contoh penggunaannya.</p>
+                    </div>
+
+                    <!-- Kotak Pencarian & Filter Kategori -->
+                    <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <div class="relative flex-1 sm:w-64">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input type="text" id="doc-search" oninput="filterDocs()" placeholder="Cari perintah (misal: Getadc, Pwm1a)..." class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 outline-none text-sm">
+                        </div>
+                        <select id="doc-category" onchange="filterDocs()" class="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-700 outline-none focus:border-sky-500">
+                            <option value="ALL">Semua Kategori</option>
+                            <option value="DIREKTIF">Direktif & Tipe Data</option>
+                            <option value="IO">Port Input / Output</option>
+                            <option value="ADC">Sensor & ADC</option>
+                            <option value="PWM">Timer & PWM Motor</option>
+                            <option value="KONTROL">Alur Logika & Waktu</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Grid Kartu Dokumentasi -->
+                <div id="docs-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Di-render lewat JavaScript -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================================================================== -->
+        <!-- TAB 4: SIMULATOR VIRTUAL ROBOT LINE FOLLOWER & ATMEGA8535             -->
+        <!-- ===================================================================== -->
+        <section id="tab-simulator" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Area Arena Canvas Robot -->
+                <div class="lg:col-span-7 bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <div>
+                            <h2 class="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-robot text-sky-600"></i> Arena Simulasi Robot Line Follower
+                            </h2>
+                            <p class="text-xs text-slate-500">Uji pengaruh kecepatan PWM dan pembacaan 3 sensor inframerah pada lintasan</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button id="sim-play-btn" onclick="toggleSimRunning()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+                                <i class="fa-solid fa-pause"></i> <span>Jeda</span>
+                            </button>
+                            <button onclick="resetRobotSim()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-rotate-left"></i> Reset Posisi
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Responsive Canvas Container -->
+                    <div id="sim-canvas-wrapper" class="relative w-full h-[340px] sm:h-[400px] bg-slate-100 rounded-2xl border-2 border-slate-300 overflow-hidden">
+                        <canvas id="robot-sim-canvas" class="block w-full h-full"></canvas>
+
+                        <!-- Overlay Status Real-Time di Pojok Canvas -->
+                        <div class="absolute top-3 left-3 bg-slate-900/85 backdrop-blur-md text-white px-3 py-2 rounded-xl text-xs font-mono space-y-1 border border-slate-700">
+                            <div class="text-sky-400 font-bold">STATUS SENSOR (PINA)</div>
+                            <div class="flex items-center gap-3">
+                                <span>Kiri: <strong id="sim-sl" class="text-amber-300">0</strong></span>
+                                <span>Tengah: <strong id="sim-sc" class="text-amber-300">1</strong></span>
+                                <span>Kanan: <strong id="sim-sr" class="text-amber-300">0</strong></span>
+                            </div>
+                        </div>
+
+                        <div class="absolute bottom-3 left-3 right-3 flex flex-wrap justify-between items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-200 text-xs">
+                            <span class="font-semibold text-slate-700">Aksi Robot: <strong id="sim-action-label" class="text-sky-700">MAJU LURUS</strong></span>
+                            <span class="font-mono text-slate-600">PORTB = <strong id="sim-portb-val">&amp;B00001010</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel Kontrol Parameter & Live Code Trace -->
+                <div class="lg:col-span-5 space-y-5">
+                    <!-- Pengaturan Register PWM -->
+                    <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-sky-600"></i> Tuning Register PWM ATmega8535
+                        </h3>
+
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold mb-1">
+                                <span class="text-slate-700">Kecepatan Dasar Lurus (<code>Pwm1a &amp; Pwm1b</code>)</span>
+                                <span id="sim-base-speed-val" class="font-mono text-sky-600 font-bold">170 / 255</span>
+                            </div>
+                            <input type="range" id="sim-base-speed" min="80" max="255" value="170" oninput="updateSimParams()" class="w-full accent-sky-600 cursor-pointer">
+                            <p class="text-[11px] text-slate-400 mt-1">Tips: Jika PWM terlalu tinggi (255), robot bisa keluar jalur saat tikungan tajam!</p>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold mb-1">
+                                <span class="text-slate-700">Kecepatan Belok / Koreksi (<code>Pwm_belok</code>)</span>
+                                <span id="sim-turn-speed-val" class="font-mono text-amber-600 font-bold">140 / 255</span>
+                            </div>
+                            <input type="range" id="sim-turn-speed" min="60" max="230" value="140" oninput="updateSimParams()" class="w-full accent-amber-500 cursor-pointer">
+                        </div>
+
+                        <!-- Indikator LED Port B -->
+                        <div class="pt-2 border-t border-slate-100">
+                            <span class="text-xs font-bold text-slate-700 block mb-2">Indikator Pin Driver L298N (PORTB.0 – PORTB.3):</span>
+                            <div class="grid grid-cols-4 gap-2 text-center font-mono text-xs">
+                                <div class="p-2 rounded-xl bg-slate-900 text-white">
+                                    <div id="led-pb0" class="w-3 h-3 rounded-full bg-slate-600 mx-auto mb-1"></div>
+                                    <span>PB0 (IN1)</span>
+                                </div>
+                                <div class="p-2 rounded-xl bg-slate-900 text-white">
+                                    <div id="led-pb1" class="w-3 h-3 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400 mx-auto mb-1"></div>
+                                    <span>PB1 (IN2)</span>
+                                </div>
+                                <div class="p-2 rounded-xl bg-slate-900 text-white">
+                                    <div id="led-pb2" class="w-3 h-3 rounded-full bg-slate-600 mx-auto mb-1"></div>
+                                    <span>PB2 (IN3)</span>
+                                </div>
+                                <div class="p-2 rounded-xl bg-slate-900 text-white">
+                                    <div id="led-pb3" class="w-3 h-3 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400 mx-auto mb-1"></div>
+                                    <span>PB3 (IN4)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Eksekusi Kode BASCOM-AVR Real-Time -->
+                    <div class="bg-slate-900 rounded-3xl p-5 text-slate-100 border border-slate-800 shadow-lg">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-mono font-bold text-emerald-400"><i class="fa-solid fa-code-branch"></i> Eksekusi Logika BASCOM-AVR</span>
+                            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">RUNNING</span>
+                        </div>
+                        <div class="font-mono text-xs space-y-1 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+                            <div id="trace-line-0" class="px-2 py-1 rounded transition text-slate-400">' Sensor: 1 = Garis Hitam, 0 = Putih</div>
+                            <div id="trace-line-1" class="px-2 py-1 rounded transition">If Pina = &amp;B010 Then ' Tengah di garis -> MAJU</div>
+                            <div id="trace-line-2" class="px-2 py-1 rounded transition">ElseIf Pina.0 = 1 Then ' Kiri kena garis -> BELOK KIRI</div>
+                            <div id="trace-line-3" class="px-2 py-1 rounded transition">ElseIf Pina.2 = 1 Then ' Kanan kena garis -> BELOK KANAN</div>
+                            <div id="trace-line-4" class="px-2 py-1 rounded transition">Else ' Semua garis (Perempatan) -> MAJU TERUS</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================================================================== -->
+        <!-- TAB 5: ARENA 5 PERMAINAN PUZZLE INTERAKTIF                            -->
+        <!-- ===================================================================== -->
+        <section id="tab-puzzle" class="tab-content hidden space-y-6">
+            <!-- Selector 5 Jenis Game Puzzle -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <button onclick="selectPuzzleGame(1)" data-pz="1" class="pz-tab-btn active p-3.5 rounded-2xl border-2 border-sky-600 bg-sky-50 text-left transition shadow-sm">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-extrabold text-sky-700">PUZZLE #1</span>
+                        <span id="pz-status-1" class="text-xs text-slate-400"><i class="fa-regular fa-circle"></i></span>
+                    </div>
+                    <div class="font-bold text-slate-900 text-xs sm:text-sm">Susun Blok Kode</div>
+                    <div class="text-[11px] text-slate-500">Sintaks BASCOM-AVR</div>
+                </button>
+
+                <button onclick="selectPuzzleGame(2)" data-pz="2" class="pz-tab-btn p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-sky-300 text-left transition">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-extrabold text-amber-600">PUZZLE #2</span>
+                        <span id="pz-status-2" class="text-xs text-slate-400"><i class="fa-regular fa-circle"></i></span>
+                    </div>
+                    <div class="font-bold text-slate-900 text-xs sm:text-sm">Rakit Pinout IC</div>
+                    <div class="text-[11px] text-slate-500">40-Pin ATmega8535</div>
+                </button>
+
+                <button onclick="selectPuzzleGame(3)" data-pz="3" class="pz-tab-btn p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-sky-300 text-left transition">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-extrabold text-emerald-600">PUZZLE #3</span>
+                        <span id="pz-status-3" class="text-xs text-slate-400"><i class="fa-regular fa-circle"></i></span>
+                    </div>
+                    <div class="font-bold text-slate-900 text-xs sm:text-sm">Bit Register 8-Bit</div>
+                    <div class="text-[11px] text-slate-500">Biner & Hex DDR/PORT</div>
+                </button>
+
+                <button onclick="selectPuzzleGame(4)" data-pz="4" class="pz-tab-btn p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-sky-300 text-left transition">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-extrabold text-indigo-600">PUZZLE #4</span>
+                        <span id="pz-status-4" class="text-xs text-slate-400"><i class="fa-regular fa-circle"></i></span>
+                    </div>
+                    <div class="font-bold text-slate-900 text-xs sm:text-sm">Logika Jalur Robot</div>
+                    <div class="text-[11px] text-slate-500">Sensor & Driver L298N</div>
+                </button>
+
+                <button onclick="selectPuzzleGame(5)" data-pz="5" class="pz-tab-btn p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-sky-300 text-left transition col-span-2 sm:col-span-1">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-extrabold text-rose-600">PUZZLE #5</span>
+                        <span id="pz-status-5" class="text-xs text-slate-400"><i class="fa-regular fa-circle"></i></span>
+                    </div>
+                    <div class="font-bold text-slate-900 text-xs sm:text-sm">TTS Robotika AVR</div>
+                    <div class="text-[11px] text-slate-500">Teka-Teki Silang</div>
+                </button>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- PUZZLE 1: SUSUN BLOK KODE BASCOM-AVR (PARSONS PUZZLE)             -->
+            <!-- ================================================================= -->
+            <div id="puzzle-panel-1" class="puzzle-panel bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <span class="px-2.5 py-1 rounded-lg bg-sky-100 text-sky-700 text-xs font-bold">PUZZLE #1 • ALGORITMA & SINTAKS</span>
+                        <h3 class="text-xl font-extrabold text-slate-900 mt-1" id="pz1-title">Level 1: Struktur Dasar Kedip LED</h3>
+                        <p class="text-sm text-slate-600" id="pz1-desc">Ketuk/klik potongan baris kode di sebelah kiri agar tersusun menjadi program BASCOM-AVR yang benar di sebelah kanan!</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="pz1-level-indicator" class="px-3 py-1.5 rounded-xl bg-slate-100 font-mono text-xs font-bold text-slate-700">Level 1 / 4</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Bank Potongan Kode Acak -->
+                    <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-layer-group text-sky-600"></i> Bank Potongan Kode (Klik untuk Memasang)
+                        </h4>
+                        <div id="pz1-bank" class="space-y-2 min-h-[220px]"></div>
+                    </div>
+
+                    <!-- Area Susunan Kode Siswa -->
+                    <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 text-white">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                                <i class="fa-solid fa-terminal"></i> Editor Susunan Program (Klik untuk Melepas)
+                            </h4>
+                            <button onclick="resetPz1Level()" class="text-xs text-slate-400 hover:text-white"><i class="fa-solid fa-rotate-left"></i> Ulangi</button>
+                        </div>
+                        <div id="pz1-target" class="space-y-2 min-h-[220px]"></div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+                    <button onclick="showPz1Hint()" class="px-4 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold flex items-center gap-2 transition">
+                        <i class="fa-solid fa-lightbulb"></i> Petunjuk Guru
+                    </button>
+                    <button onclick="checkPz1Solution()" class="px-6 py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-sm font-bold flex items-center gap-2 shadow-md transition">
+                        <i class="fa-solid fa-check-double"></i> Kompilasi & Periksa Susunan
+                    </button>
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- PUZZLE 2: RAKIT PINOUT & WIRING ATMEGA8535                        -->
+            <!-- ================================================================= -->
+            <div id="puzzle-panel-2" class="puzzle-panel hidden bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <span class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-xs font-bold">PUZZLE #2 • PERANGKAT KERAS & WIRING</span>
+                        <h3 class="text-xl font-extrabold text-slate-900 mt-1">Tantangan Koneksi Pin ATmega8535</h3>
+                        <p class="text-sm text-slate-600">Baca perintah perakitan robot di bawah, lalu klik kaki pin yang tepat pada badan IC ATmega8535!</p>
+                    </div>
+                    <span id="pz2-progress" class="px-3 py-1.5 rounded-xl bg-slate-100 font-mono text-xs font-bold text-slate-700">Misi 1 / 6</span>
+                </div>
+
+                <!-- Kartu Misi Wiring Aktif -->
+                <div class="bg-gradient-to-r from-slate-900 to-sky-950 text-white p-5 rounded-2xl border border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <span class="text-xs font-mono text-amber-400 font-bold uppercase">Instruksi Teknisi Robotika:</span>
+                        <h4 id="pz2-mission-text" class="text-base sm:text-lg font-bold text-white">Hubungkan sinyal PWM Motor Kiri (OC1A) dari Driver L298N ke mikrokontroler!</h4>
+                        <p id="pz2-mission-hint" class="text-xs text-sky-300">Petunjuk: Periksa kelompok Port D pada sisi kiri bawah IC.</p>
+                    </div>
+                    <div class="shrink-0 bg-white/10 px-4 py-2 rounded-xl border border-white/15 text-center">
+                        <span class="text-[10px] uppercase text-slate-300 block">Skor Misi</span>
+                        <span id="pz2-score" class="font-mono font-extrabold text-lg text-amber-400">0 / 6</span>
+                    </div>
+                </div>
+
+                <!-- Chip Interaktif Game Pinout -->
+                <div class="w-full overflow-x-auto py-2">
+                    <div id="pz2-chip-board" class="min-w-[520px] max-w-[600px] mx-auto bg-slate-900 rounded-2xl p-4 sm:p-6 border-2 border-slate-700"></div>
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- PUZZLE 3: BIT REGISTER BINER & HEXADECIMAL                        -->
+            <!-- ================================================================= -->
+            <div id="puzzle-panel-3" class="puzzle-panel hidden bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <span class="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-bold">PUZZLE #3 • REGISTER & SISTEM BILANGAN</span>
+                        <h3 class="text-xl font-extrabold text-slate-900 mt-1">Saklar Register 8-Bit (DDRA / PORTB)</h3>
+                        <p class="text-sm text-slate-600">Atur posisi 8 saklar bit (<code>Bit 7</code> hingga <code>Bit 0</code>) sesuai spesifikasi register yang diminta!</p>
+                    </div>
+                    <span id="pz3-level" class="px-3 py-1.5 rounded-xl bg-slate-100 font-mono text-xs font-bold text-slate-700">Tantangan 1 / 5</span>
+                </div>
+
+                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-2">
+                    <div class="text-xs font-bold text-emerald-700 uppercase">Spesifikasi Perangkat Keras:</div>
+                    <p id="pz3-prompt" class="text-sm sm:text-base font-bold text-slate-900">
+                        Konfigurasikan register <code class="text-sky-700">DDRA</code> agar 4 pin bawah (<code class="text-sky-700">PA0..PA3</code>) menjadi <strong>INPUT (0)</strong> untuk sensor garis, dan 4 pin atas (<code class="text-sky-700">PA4..PA7</code>) menjadi <strong>OUTPUT (1)</strong> untuk indikator LED!
+                    </p>
+                </div>
+
+                <!-- 8 Saklar Bit Interaktif -->
+                <div class="bg-slate-900 rounded-3xl p-6 text-white space-y-6">
+                    <div class="grid grid-cols-4 sm:grid-cols-8 gap-2.5" id="pz3-bit-switches">
+                        <!-- Di-render via JS -->
+                    </div>
+
+                    <!-- Live Readout Biner, Hex, Desimal -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-800 font-mono text-center">
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <span class="text-[10px] text-slate-400 block">FORMAT BINER BASCOM</span>
+                            <span id="pz3-bin-out" class="text-base sm:text-lg font-bold text-emerald-400">&amp;B00000000</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <span class="text-[10px] text-slate-400 block">FORMAT HEXADECIMAL</span>
+                            <span id="pz3-hex-out" class="text-base sm:text-lg font-bold text-amber-400">&amp;H00</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <span class="text-[10px] text-slate-400 block">NILAI DESIMAL</span>
+                            <span id="pz3-dec-out" class="text-base sm:text-lg font-bold text-sky-400">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button onclick="checkPz3Solution()" class="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 shadow-md transition">
+                        <i class="fa-solid fa-microchip"></i> Kirim Nilai ke Register
+                    </button>
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- PUZZLE 4: LABIRIN LOGIKA SENSOR & DRIVER MOTOR L298N              -->
+            <!-- ================================================================= -->
+            <div id="puzzle-panel-4" class="puzzle-panel hidden bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <span class="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-800 text-xs font-bold">PUZZLE #4 • LOGIKA KENDALI ROBOT</span>
+                        <h3 class="text-xl font-extrabold text-slate-900 mt-1">Puzzle Keputusan Navigasi Line Follower</h3>
+                        <p class="text-sm text-slate-600">Amati posisi garis hitam di bawah sensor robot, lalu pilih arah putaran Motor Kiri, Motor Kanan, dan sintaks BASCOM-AVR yang tepat!</p>
+                    </div>
+                    <span id="pz4-stage" class="px-3 py-1.5 rounded-xl bg-slate-100 font-mono text-xs font-bold text-slate-700">Kasus 1 / 4</span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                    <!-- Visualisasi Posisi Garis & 3 Sensor -->
+                    <div class="lg:col-span-5 bg-slate-100 rounded-2xl p-6 border-2 border-slate-300 flex flex-col items-center">
+                        <span class="text-xs font-bold text-slate-500 uppercase mb-3">Tampilan Bawah Sensor Robot</span>
+                        <div id="pz4-track-visual" class="w-56 h-48 bg-white rounded-xl border border-slate-300 relative overflow-hidden flex items-center justify-center shadow-inner">
+                            <!-- Garis hitam & 3 indikator sensor di-render JS -->
+                        </div>
+                        <div id="pz4-sensor-readout" class="mt-3 font-mono text-xs font-bold text-slate-800 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+                            PINA = &amp;B00000100 (Sensor Kiri = 1)
+                        </div>
+                    </div>
+
+                    <!-- Panel Keputusan Aktuator & Kode -->
+                    <div class="lg:col-span-7 space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                                <label class="block text-xs font-bold text-slate-700 mb-2"><i class="fa-solid fa-gear text-sky-600"></i> Aksi Motor Roda Kiri:</label>
+                                <select id="pz4-left-motor" class="w-full p-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold">
+                                    <option value="">-- Pilih Arah Motor Kiri --</option>
+                                    <option value="MAJU">Putar Maju (Cepat)</option>
+                                    <option value="STOP">Berhenti / Pelan (Stop)</option>
+                                    <option value="MUNDUR">Putar Mundur (Reverse)</option>
+                                </select>
+                            </div>
+
+                            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                                <label class="block text-xs font-bold text-slate-700 mb-2"><i class="fa-solid fa-gear text-amber-600"></i> Aksi Motor Roda Kanan:</label>
+                                <select id="pz4-right-motor" class="w-full p-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold">
+                                    <option value="">-- Pilih Arah Motor Kanan --</option>
+                                    <option value="MAJU">Putar Maju (Cepat)</option>
+                                    <option value="STOP">Berhenti / Pelan (Stop)</option>
+                                    <option value="MUNDUR">Putar Mundur (Reverse)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="p-4 rounded-2xl bg-slate-900 text-white space-y-2">
+                            <label class="block text-xs font-mono text-emerald-400 font-bold">Lengkapi Potongan Kode BASCOM-AVR:</label>
+                            <div class="font-mono text-xs sm:text-sm bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                                <div id="pz4-code-cond" class="text-sky-300">If Pina.2 = 1 Then ' Garis terdeteksi di sisi kiri</div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-slate-400 pl-3">Hasil Gerak =</span>
+                                    <select id="pz4-code-choice" class="bg-slate-800 text-amber-300 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none">
+                                        <option value="">-- Pilih Perintah Robot --</option>
+                                        <option value="BELOK_KIRI">Pwm1a = 0 : Pwm1b = 200 ' Belok Kiri</option>
+                                        <option value="BELOK_KANAN">Pwm1a = 200 : Pwm1b = 0 ' Belok Kanan</option>
+                                        <option value="MAJU_LURUS">Pwm1a = 200 : Pwm1b = 200 ' Maju Lurus</option>
+                                        <option value="REM_STOP">Pwm1a = 0 : Pwm1b = 0 ' Berhenti</option>
+                                    </select>
+                                </div>
+                                <div class="text-sky-300">End If</div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end">
+                            <button onclick="checkPz4Solution()" class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold flex items-center gap-2 shadow-md transition">
+                                <i class="fa-solid fa-play"></i> Uji Jalankan Robot
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- PUZZLE 5: TEKA-TEKI SILANG (TTS) ELEKTRONIKA & BASCOM-AVR         -->
+            <!-- ================================================================= -->
+            <div id="puzzle-panel-5" class="puzzle-panel hidden bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <span class="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-800 text-xs font-bold">PUZZLE #5 • TERMINOLOGI TEKNIK</span>
+                        <h3 class="text-xl font-extrabold text-slate-900 mt-1">Teka-Teki Silang Mikrokontroler & BASCOM-AVR</h3>
+                        <p class="text-sm text-slate-600">Isi kotak mendatar dan menurun berdasarkan petunjuk perangkat keras ATmega8535 dan sintaks pemrograman!</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="revealCrosswordHint()" class="px-3.5 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold transition">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Buka 1 Huruf
+                        </button>
+                        <button onclick="checkCrossword()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition">
+                            <i class="fa-solid fa-check"></i> Periksa TTS
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- Papan Grid TTS -->
+                    <div class="lg:col-span-6 flex justify-center bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-800 overflow-x-auto">
+                        <div id="crossword-grid" class="grid grid-cols-10 gap-1 w-full max-w-[380px]"></div>
+                    </div>
+
+                    <!-- Daftar Pertanyaan Mendatar & Menurun -->
+                    <div class="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
+                            <h4 class="font-extrabold text-slate-900 text-sm border-b border-slate-200 pb-1.5">
+                                <i class="fa-solid fa-arrows-left-right text-sky-600"></i> MENDATAR
+                            </h4>
+                            <ul id="cw-clues-across" class="space-y-2 text-slate-700 leading-relaxed"></ul>
+                        </div>
+
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
+                            <h4 class="font-extrabold text-slate-900 text-sm border-b border-slate-200 pb-1.5">
+                                <i class="fa-solid fa-arrows-up-down text-rose-600"></i> MENURUN
+                            </h4>
+                            <ul id="cw-clues-down" class="space-y-2 text-slate-700 leading-relaxed"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-12 py-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-microchip text-sky-600"></i>
+                <span><strong>RoboAVR Lab</strong> — Media Pembelajaran Interaktif SMK Teknik Elektronika Industri</span>
+            </div>
+            <div>Topik: Pemrograman ATmega8535 dengan BASCOM-AVR untuk Kendali Robotika</div>
+        </div>
+    </footer>
+
+    <!-- ========================================================================= -->
+    <!-- SCRIPT UTAMA: LOGIKA TEORI, SIMULATOR ROBOT, AUDIO & 5 GAME PUZZLE        -->
+    <!-- ========================================================================= -->
+    <script>
+        /* =====================================================================
+           1. SISTEM AUDIO SINTETIS (TONE.JS) - TANPA FILE EKSTERNAL
+           ===================================================================== */
+        let audioEnabled = true;
+        let synth = null;
+
+        function initAudio() {
+            if (!synth && typeof Tone !== 'undefined') {
+                synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "triangle" },
+                    envelope: { attack: 0.01, decay: 0.12, sustain: 0.05, release: 0.2 }
+                }).toDestination();
+                synth.volume.value = -10;
+            }
+        }
+
+        function playSound(type) {
+            if (!audioEnabled) return;
+            try {
+                if (Tone.context.state !== 'running') Tone.start();
+                initAudio();
+                if (!synth) return;
+
+                const now = Tone.now();
+                if (type === 'click') {
+                    synth.triggerAttackRelease("C5", "32n", now);
+                } else if (type === 'snap') {
+                    synth.triggerAttackRelease("E5", "32n", now);
+                } else if (type === 'success') {
+                    synth.triggerAttackRelease(["C5", "E5", "G5"], "16n", now);
+                    synth.triggerAttackRelease("C6", "8n", now + 0.15);
+                } else if (type === 'error') {
+                    synth.triggerAttackRelease(["E3", "Bb3"], "8n", now);
+                }
+            } catch (e) {
+                // Abaikan jika browser memblokir audio sebelum interaksi pertama
+            }
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const icon = document.getElementById('audio-icon');
+            if (audioEnabled) {
+                icon.className = "fa-solid fa-volume-high text-sky-400";
+                playSound('click');
+                showToast("Efek suara diaktifkan", "info");
+            } else {
+                icon.className = "fa-solid fa-volume-xmark text-slate-500";
+                showToast("Efek suara dimatikan", "info");
+            }
+        }
+
+        /* =====================================================================
+           2. TOAST NOTIFICATION & CUSTOM MODAL (PENGGANTI ALERT/CONFIRM)
+           ===================================================================== */
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const styles = {
+                success: 'bg-emerald-600 text-white border-emerald-500',
+                error: 'bg-rose-600 text-white border-rose-500',
+                warning: 'bg-amber-500 text-slate-950 border-amber-400',
+                info: 'bg-slate-900 text-white border-slate-700'
+            };
+            const icons = {
+                success: 'fa-circle-check',
+                error: 'fa-circle-xmark',
+                warning: 'fa-triangle-exclamation',
+                info: 'fa-circle-info'
+            };
+
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border text-xs sm:text-sm font-semibold transform transition-all duration-300 translate-y-2 opacity-0 ${styles[type] || styles.info}`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} text-base"></i><span class="flex-1">${message}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3400);
+        }
+
+        let modalCallback = null;
+        function openCustomModal({ title, body, showInput = false, defaultValue = '', confirmText = 'Konfirmasi', onConfirm }) {
+            const modal = document.getElementById('custom-modal');
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-body').textContent = body;
+            document.getElementById('modal-confirm').textContent = confirmText;
+
+            const inputWrap = document.getElementById('modal-input-wrap');
+            const inputEl = document.getElementById('modal-input');
+            if (showInput) {
+                inputWrap.classList.remove('hidden');
+                inputEl.value = defaultValue;
+            } else {
+                inputWrap.classList.add('hidden');
+            }
+
+            modalCallback = onConfirm;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            if (showInput) inputEl.focus();
+        }
+
+        document.getElementById('modal-cancel').addEventListener('click', () => {
+            const modal = document.getElementById('custom-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        });
+
+        document.getElementById('modal-confirm').addEventListener('click', () => {
+            const modal = document.getElementById('custom-modal');
+            const val = document.getElementById('modal-input').value;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            if (modalCallback) modalCallback(val);
+        });
+
+        /* =====================================================================
+           3. STATE PROGRES SISWA & PENYIMPANAN LOCALSTORAGE
+           ===================================================================== */
+        let studentState = {
+            name: 'Siswa TEI',
+            xp: 0,
+            solvedPuzzles: { 1: false, 2: false, 3: false, 4: false, 5: false }
+        };
+
+        function loadState() {
+            try {
+                const saved = localStorage.getItem('roboavr_smk_state');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    studentState = { ...studentState, ...parsed };
+                }
+            } catch (e) {}
+            updateProgressUI();
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem('roboavr_smk_state', JSON.stringify(studentState));
+            } catch (e) {}
+            updateProgressUI();
+        }
+
+        function awardXP(amount, puzzleId = null) {
+            if (puzzleId && studentState.solvedPuzzles[puzzleId]) {
+                showToast(`Puzzle #${puzzleId} sudah selesai sebelumnya! Tetap semangat berlatih!`, "success");
+                return;
+            }
+            studentState.xp += amount;
+            if (puzzleId) {
+                studentState.solvedPuzzles[puzzleId] = true;
+            }
+            saveState();
+            playSound('success');
+            showToast(`Luar biasa! Kamu memperoleh +${amount} XP!`, "success");
+        }
+
+        function updateProgressUI() {
+            document.getElementById('student-name-display').textContent = studentState.name;
+            document.getElementById('xp-display').textContent = `${studentState.xp} XP`;
+
+            const solvedCount = Object.values(studentState.solvedPuzzles).filter(Boolean).length;
+            document.getElementById('puzzle-badge-count').textContent = `${solvedCount}/5`;
+            document.getElementById('dash-puzzle-stat').textContent = `${solvedCount} / 5 Arena`;
+
+            // Peringkat kompetensi siswa
+            let rank = "Taruna Pemula";
+            if (studentState.xp >= 450) rank = "Master Robotika AVR";
+            else if (studentState.xp >= 300) rank = "Teknisi Kendali Handal";
+            else if (studentState.xp >= 150) rank = "Programmer Mikrokontroler";
+            else if (studentState.xp >= 50) rank = "Asisten Lab Elektronika";
+            document.getElementById('dash-rank-stat').textContent = rank;
+
+            // Update ikon status pada 5 tab puzzle
+            for (let i = 1; i <= 5; i++) {
+                const el = document.getElementById(`pz-status-${i}`);
+                if (el) {
+                    if (studentState.solvedPuzzles[i]) {
+                        el.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500"></i>`;
+                    } else {
+                        el.innerHTML = `<i class="fa-regular fa-circle text-slate-400"></i>`;
+                    }
+                }
+            }
+        }
+
+        function openStudentModal() {
+            openCustomModal({
+                title: "Identitas Siswa Praktikum",
+                body: "Masukkan nama lengkap atau kelompokmu untuk ditampilkan pada papan skor laboratorium:",
+                showInput: true,
+                defaultValue: studentState.name,
+                confirmText: "Simpan Nama",
+                onConfirm: (newName) => {
+                    if (newName && newName.trim().length > 0) {
+                        studentState.name = newName.trim();
+                        saveState();
+                        showToast(`Selamat belajar, ${studentState.name}!`, "success");
+                    }
+                }
+            });
+        }
+
+        function confirmResetProgress() {
+            openCustomModal({
+                title: "Reset Progres Belajar?",
+                body: "Semua skor XP dan status penyelesaian 5 game puzzle akan dikembalikan ke nol.",
+                confirmText: "Ya, Reset",
+                onConfirm: () => {
+                    studentState.xp = 0;
+                    studentState.solvedPuzzles = { 1: false, 2: false, 3: false, 4: false, 5: false };
+                    saveState();
+                    showToast("Progres berhasil direset.", "info");
+                }
+            });
+        }
+
+        /* =====================================================================
+           4. NAVIGASI TAB UTAMA & SUB-BAB TEORI
+           ===================================================================== */
+        function switchTab(tabId) {
+            playSound('click');
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.dataset.tab === tabId) {
+                    btn.classList.add('bg-sky-600', 'text-white', 'shadow-sm');
+                    btn.classList.remove('text-slate-300', 'hover:bg-slate-800');
+                } else {
+                    btn.classList.remove('bg-sky-600', 'text-white', 'shadow-sm');
+                    btn.classList.add('text-slate-300', 'hover:bg-slate-800');
+                }
+            });
+
+            if (tabId === 'simulator') {
+                setTimeout(resizeSimCanvas, 50);
+            }
+        }
+
+        function switchTheoryChapter(chNum) {
+            playSound('click');
+            document.querySelectorAll('.theory-chapter').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`theory-ch-${chNum}`).classList.remove('hidden');
+
+            document.querySelectorAll('.ch-btn').forEach(btn => {
+                if (parseInt(btn.dataset.ch) === chNum) {
+                    btn.classList.add('bg-sky-600', 'text-white');
+                    btn.classList.remove('bg-slate-100', 'text-slate-700');
+                } else {
+                    btn.classList.remove('bg-sky-600', 'text-white');
+                    btn.classList.add('bg-slate-100', 'text-slate-700');
+                }
+            });
+        }
+
+        function copyCodeBlock(elementId) {
+            const text = document.getElementById(elementId).innerText;
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                playSound('snap');
+                showToast("Kode BASCOM-AVR berhasil disalin ke clipboard!", "success");
+            } catch (err) {
+                showToast("Gagal menyalin kode.", "error");
+            }
+            document.body.removeChild(textarea);
+        }
+
+        /* =====================================================================
+           5. DATA LENGKAP 40-PIN ATMEGA8535 (DIP-40)
+           ===================================================================== */
+        const ATMEGA8535_PINS = [
+            // Sisi Kiri (Pin 1 - 20)
+            { num: 1, name: "PB0 (XCK/T0)", group: "PORTB", color: "bg-emerald-500", role: "Port B Bit 0 / Timer0 External Clock", desc: "Jalur I/O digital dua arah. Sering dipakai untuk pin arah motor IN1 pada driver L298N." },
+            { num: 2, name: "PB1 (T1)", group: "PORTB", color: "bg-emerald-500", role: "Port B Bit 1 / Timer1 Counter Input", desc: "Jalur I/O digital dua arah. Cocok untuk pin arah motor IN2 pada driver L298N." },
+            { num: 3, name: "PB2 (INT2/AIN0)", group: "PORTB", color: "bg-emerald-500", role: "Port B Bit 2 / External Interrupt 2", desc: "Dapat digunakan sebagai interupsi eksternal atau kontrol arah motor IN3." },
+            { num: 4, name: "PB3 (OC0/AIN1)", group: "PORTB", color: "bg-emerald-500", role: "Port B Bit 3 / Output Compare Timer0", desc: "Dapat menghasilkan sinyal PWM 8-bit dari Timer0 atau kontrol arah motor IN4." },
+            { num: 5, name: "PB4 (SS)", group: "PORTB", color: "bg-emerald-500", role: "Port B Bit 4 / SPI Slave Select", desc: "Jalur pemilihan slave saat komunikasi SPI atau output LED indikator." },
+            { num: 6, name: "PB5 (MOSI)", group: "PORTB", color: "bg-emerald-500", role: "Port B Bit 5 / Master Out Slave In", desc: "Jalur utama pengisian program (Downloader USBasp) ke memori Flash ATmega8535." },
+            { num: 7, name: "PB6 (MISO)", group: "PORTB", color: "bg-emerald-500", role: "Port B Bit 6 / Master In Slave Out", desc: "Jalur verifikasi data saat downloading program via USBasp ISP." },
+            { num: 8, name: "PB7 (SCK)", group: "PORTB", color: "bg-emerald-500", role: "Port B Bit 7 / Serial Clock ISP", desc: "Detak sinkronisasi saat pemrograman ISP dan komunikasi SPI." },
+            { num: 9, name: "RESET", group: "PWR", color: "bg-rose-500", role: "Reset Input (Active Low)", desc: "Merestart mikrokontroler dari awal program jika dihubungkan ke GND (0V). Hubungkan ke +5V melalui resistor 10kΩ." },
+            { num: 10, name: "VCC", group: "PWR", color: "bg-rose-500", role: "Catu Daya Digital (+5V DC)", desc: "Pin sumber tegangan positif utama +5V DC teregulasi (IC 7805)." },
+            { num: 11, name: "GND", group: "PWR", color: "bg-rose-500", role: "Ground Digital (0V)", desc: "Referensi tegangan 0V (Negatif catu daya)." },
+            { num: 12, name: "XTAL2", group: "PWR", color: "bg-rose-500", role: "Output Osilator Kristal", desc: "Dihubungkan ke kaki kristal eksternal (misal 16 MHz) beserta kapasitor keramik 22pF ke GND." },
+            { num: 13, name: "XTAL1", group: "PWR", color: "bg-rose-500", role: "Input Osilator Kristal", desc: "Input detak utama CPU dari kristal eksternal 11.0592 MHz atau 16 MHz." },
+            { num: 14, name: "PD0 (RXD)", group: "PORTD", color: "bg-sky-500", role: "Port D Bit 0 / UART Receive Data", desc: "Menerima data serial dari Bluetooth HC-05, komputer, atau modul GPS." },
+            { num: 15, name: "PD1 (TXD)", group: "PORTD", color: "bg-sky-500", role: "Port D Bit 1 / UART Transmit Data", desc: "Mengirim data serial (telemetri sensor) ke komputer atau modul Bluetooth." },
+            { num: 16, name: "PD2 (INT0)", group: "PORTD", color: "bg-sky-500", role: "Port D Bit 2 / External Interrupt 0", desc: "Sangat ideal untuk membaca pulsa cepat dari sensor Rotary Encoder roda robot." },
+            { num: 17, name: "PD3 (INT1)", group: "PORTD", color: "bg-sky-500", role: "Port D Bit 3 / External Interrupt 1", desc: "Interupsi eksternal prioritas tinggi untuk sensor tabrakan atau encoder roda kedua." },
+            { num: 18, name: "PD4 (OC1B)", group: "PORTD", color: "bg-sky-500", role: "Port D Bit 4 / PWM Kanal B (Timer1)", desc: "Keluaran sinyal PWM1B untuk mengatur kecepatan Motor Kanan (ENB L298N)." },
+            { num: 19, name: "PD5 (OC1A)", group: "PORTD", color: "bg-sky-500", role: "Port D Bit 5 / PWM Kanal A (Timer1)", desc: "Keluaran sinyal PWM1A untuk mengatur kecepatan Motor Kiri (ENA L298N)." },
+            { num: 20, name: "PD6 (ICP1)", group: "PORTD", color: "bg-sky-500", role: "Port D Bit 6 / Input Capture Pin", desc: "Mengukur lebar pulsa Echo dari sensor jarak ultrasonik HC-SR04." },
+
+            // Sisi Kanan (Pin 40 turun ke 21 sesuai fisik IC DIP-40!)
+            { num: 40, name: "PA0 (ADC0)", group: "PORTA", color: "bg-amber-500", role: "Port A Bit 0 / Input Analog ADC0", desc: "Kanal ADC ke-0. Biasanya dihubungkan ke sensor garis inframerah paling kiri." },
+            { num: 39, name: "PA1 (ADC1)", group: "PORTA", color: "bg-amber-500", role: "Port A Bit 1 / Input Analog ADC1", desc: "Kanal ADC ke-1 untuk membaca sensor garis atau potensiometer pengatur kecepatan." },
+            { num: 38, name: "PA2 (ADC2)", group: "PORTA", color: "bg-amber-500", role: "Port A Bit 2 / Input Analog ADC2", desc: "Kanal ADC ke-2 untuk array sensor garis robot Line Follower." },
+            { num: 37, name: "PA3 (ADC3)", group: "PORTA", color: "bg-amber-500", role: "Port A Bit 3 / Input Analog ADC3", desc: "Kanal ADC ke-3 untuk pembacaan sensor analog." },
+            { num: 36, name: "PA4 (ADC4)", group: "PORTA", color: "bg-amber-500", role: "Port A Bit 4 / Input Analog ADC4", desc: "Kanal ADC ke-4 untuk pembacaan sensor analog." },
+            { num: 35, name: "PA5 (ADC5)", group: "PORTA", color: "bg-amber-500", role: "Port A Bit 5 / Input Analog ADC5", desc: "Kanal ADC ke-5 atau input tombol navigasi menu." },
+            { num: 34, name: "PA6 (ADC6)", group: "PORTA", color: "bg-amber-500", role: "Port A Bit 6 / Input Analog ADC6", desc: "Kanal ADC ke-6 atau sensor tegangan baterai LiPo robot." },
+            { num: 33, name: "PA7 (ADC7)", group: "PORTA", color: "bg-amber-500", role: "Port A Bit 7 / Input Analog ADC7", desc: "Kanal ADC ke-7 (ujung kanan array sensor garis)." },
+            { num: 32, name: "AREF", group: "PWR", color: "bg-rose-500", role: "Analog Reference Pin", desc: "Pin tegangan referensi untuk konversi ADC. Pasang kapasitor 100nF ke GND agar pembacaan sensor stabil." },
+            { num: 31, name: "GND", group: "PWR", color: "bg-rose-500", role: "Analog Ground (0V)", desc: "Ground khusus untuk rangkaian analog dan ADC." },
+            { num: 30, name: "AVCC", group: "PWR", color: "bg-rose-500", role: "Catu Daya Modul ADC (+5V)", desc: "Wajib dihubungkan ke +5V agar Port A dan fitur ADC dapat bekerja normal." },
+            { num: 29, name: "PC7 (TOSC2)", group: "PORTC", color: "bg-indigo-500", role: "Port C Bit 7 / Timer Oscillator 2", desc: "Jalur I/O digital dua arah. Sering dipakai untuk jalur data LCD 16x2 (D7)." },
+            { num: 28, name: "PC6 (TOSC1)", group: "PORTC", color: "bg-indigo-500", role: "Port C Bit 6 / Timer Oscillator 1", desc: "Jalur I/O digital dua arah. Jalur data LCD 16x2 (D6)." },
+            { num: 27, name: "PC5 (TDI)", group: "PORTC", color: "bg-indigo-500", role: "Port C Bit 5 / JTAG TDI", desc: "Jalur I/O digital (nonaktifkan JTAG fuse jika memakai PC2-PC5 sebagai I/O biasa)." },
+            { num: 26, name: "PC4 (TDO)", group: "PORTC", color: "bg-indigo-500", role: "Port C Bit 4 / JTAG TDO", desc: "Jalur I/O digital untuk antarmuka LCD karakter atau keypad." },
+            { num: 25, name: "PC3 (TMS)", group: "PORTC", color: "bg-indigo-500", role: "Port C Bit 3 / JTAG TMS", desc: "Jalur I/O digital untuk pin Enable (E) pada LCD 16x2." },
+            { num: 24, name: "PC2 (TCK)", group: "PORTC", color: "bg-indigo-500", role: "Port C Bit 2 / JTAG TCK", desc: "Jalur I/O digital untuk pin Register Select (RS) pada LCD 16x2." },
+            { num: 23, name: "PC1 (SDA)", group: "PORTC", color: "bg-indigo-500", role: "Port C Bit 1 / I2C Serial Data", desc: "Komunikasi I2C / TWI untuk sensor kompas, gyro MPU6050, atau OLED." },
+            { num: 22, name: "PC0 (SCL)", group: "PORTC", color: "bg-indigo-500", role: "Port C Bit 0 / I2C Serial Clock", desc: "Jalur clock komunikasi I2C / TWI." },
+            { num: 21, name: "PD7 (OC2)", group: "PORTD", color: "bg-sky-500", role: "Port D Bit 7 / Output Compare Timer2", desc: "Jalur I/O digital atau output PWM dari Timer2 (misal untuk motor servo atau buzzer)." }
+        ];
+
+        function renderChipDiagram(containerId, onPinClickCallback) {
+            const container = document.getElementById(containerId);
+            const leftPins = ATMEGA8535_PINS.slice(0, 20);  // Pin 1 - 20
+            const rightPins = ATMEGA8535_PINS.slice(20, 40); // Pin 40 - 21
+
+            let html = `<div class="grid grid-cols-11 gap-1 items-stretch">`;
+
+            // Kolom Kiri (4 kolom lebar)
+            html += `<div class="col-span-4 flex flex-col gap-1">`;
+            leftPins.forEach(pin => {
+                html += `
+                    <button type="button" onclick="${onPinClickCallback}(${pin.num})"
+                        class="chip-pin flex items-center justify-between bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-l-lg px-2 py-1 text-left group">
+                        <span class="font-mono text-[10px] sm:text-[11px] font-semibold text-slate-200 group-hover:text-white truncate">${pin.name}</span>
+                        <span class="flex items-center gap-1.5 shrink-0">
+                            <span class="font-mono text-[10px] text-slate-400">${pin.num}</span>
+                            <span class="w-2.5 h-2.5 rounded-sm ${pin.color}"></span>
+                        </span>
+                    </button>`;
+            });
+            html += `</div>`;
+
+            // Badan Tengah IC (3 kolom lebar)
+            html += `
+                <div class="col-span-3 bg-slate-950 border-2 border-slate-700 rounded-xl flex flex-col items-center justify-between py-3 px-1 relative shadow-inner">
+                    <div class="w-8 h-4 rounded-b-full bg-slate-800 border-b border-x border-slate-600 -mt-3"></div>
+                    <div class="text-center select-none my-auto">
+                        <div class="text-[10px] font-mono text-slate-500 tracking-widest uppercase">ATMEL</div>
+                        <div class="font-mono font-extrabold text-xs sm:text-sm text-sky-400 tracking-wider my-1" style="writing-mode: vertical-rl; transform: rotate(180deg);">ATMEGA8535-16PU</div>
+                    </div>
+                    <div class="w-3 h-3 rounded-full bg-slate-800 border border-slate-600 mb-1" title="Tanda Pin 1"></div>
+                </div>`;
+
+            // Kolom Kanan (4 kolom lebar)
+            html += `<div class="col-span-4 flex flex-col gap-1">`;
+            rightPins.forEach(pin => {
+                html += `
+                    <button type="button" onclick="${onPinClickCallback}(${pin.num})"
+                        class="chip-pin flex items-center justify-between bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-r-lg px-2 py-1 text-right group">
+                        <span class="flex items-center gap-1.5 shrink-0">
+                            <span class="w-2.5 h-2.5 rounded-sm ${pin.color}"></span>
+                            <span class="font-mono text-[10px] text-slate-400">${pin.num}</span>
+                        </span>
+                        <span class="font-mono text-[10px] sm:text-[11px] font-semibold text-slate-200 group-hover:text-white truncate">${pin.name}</span>
+                    </button>`;
+            });
+            html += `</div></div>`;
+
+            container.innerHTML = html;
+        }
+
+        function inspectTheoryPin(pinNum) {
+            playSound('click');
+            const pin = ATMEGA8535_PINS.find(p => p.num === pinNum);
+            if (!pin) return;
+            document.getElementById('insp-pin-num').textContent = `PIN ${pin.num}`;
+            document.getElementById('insp-pin-name').textContent = pin.name;
+            document.getElementById('insp-pin-role').textContent = pin.role;
+            document.getElementById('insp-pin-desc').textContent = pin.desc;
+        }
+
+        /* =====================================================================
+           6. DATA & FILTER DOKUMENTASI SINTAKS BASCOM-AVR
+           ===================================================================== */
+        const BASCOM_DOCS = [
+            { cmd: '$regfile = "m8535.dat"', cat: 'DIREKTIF', desc: 'Menentukan jenis IC mikrokontroler yang digunakan agar alamat register sesuai dengan ATmega8535.', example: '$regfile = "m8535.dat"' },
+            { cmd: '$crystal = 16000000', cat: 'DIREKTIF', desc: 'Memberitahu kompiler frekuensi osilator kristal (dalam Hz) untuk menghitung akurasi perintah Wait, Baudrate, dan Timer.', example: '$crystal = 16000000' },
+            { cmd: 'Dim var As Byte / Word', cat: 'DIREKTIF', desc: 'Mendeklarasikan variabel di SRAM. Byte menampung 0–255, Word menampung 0–65535 (wajib untuk nilai ADC 10-bit).', example: 'Dim Nilai_sensor As Word\nDim Kecepatan As Byte' },
+            { cmd: 'Config Portx = Output / Input', cat: 'IO', desc: 'Mengatur arah seluruh 8 kaki dalam satu Port (PortA, PortB, PortC, atau PortD) sebagai keluaran atau masukan.', example: 'Config Portb = Output\nConfig Porta = Input' },
+            { cmd: 'PORTx vs PINx', cat: 'IO', desc: 'PORTx digunakan untuk menulis logika keluaran (Output) atau mengaktifkan pull-up. PINx digunakan untuk membaca sinyal masukan (Input).', example: 'Portb.0 = 1      \' Output HIGH\nIf Pina.0 = 0 Then \' Baca Input' },
+            { cmd: 'Alias', cat: 'IO', desc: 'Memberikan nama alias yang deskriptif pada pin tertentu agar kode program mudah dibaca dan dirawat.', example: 'Motor_kiri Alias Portb.0\nMotor_kiri = 1' },
+            { cmd: 'Config Adc = Single...', cat: 'ADC', desc: 'Menginisialisasi modul Analog-to-Digital Converter internal ATmega8535 menggunakan tegangan referensi AVCC (+5V).', example: 'Config Adc = Single , Prescaler = Auto , Reference = Avcc\nStart Adc' },
+            { cmd: 'Getadc(kanal)', cat: 'ADC', desc: 'Membaca tegangan analog (0–5V) pada pin PA0 (kanal 0) hingga PA7 (kanal 7) menjadi nilai digital 0–1023.', example: 'Sensor_depan = Getadc(0)' },
+            { cmd: 'Config Timer1 = Pwm...', cat: 'PWM', desc: 'Mengatur Timer1 menjadi pembangkit sinyal PWM 8-bit pada pin OC1A (PD5) dan OC1B (PD4) untuk kontrol kecepatan motor DC.', example: 'Config Timer1 = Pwm , Pwm = 8 , Compare A Pwm = Clear Up , Compare B Pwm = Clear Up , Prescale = 64' },
+            { cmd: 'Pwm1a / Pwm1b = nilai', cat: 'PWM', desc: 'Mengisi nilai Duty Cycle PWM (0 = berhenti total, 128 = 50% kecepatan, 255 = 100% kecepatan penuh).', example: 'Pwm1a = 180\nPwm1b = 180' },
+            { cmd: 'If ... Then ... ElseIf ... End If', cat: 'KONTROL', desc: 'Struktur percabangan logika utama untuk mengambil keputusan navigasi robot berdasarkan kondisi sensor.', example: 'If Pina.1 = 1 Then\n   Pwm1a = 200\nElse\n   Pwm1a = 0\nEnd If' },
+            { cmd: 'Do ... Loop', cat: 'KONTROL', desc: 'Membuat perulangan tak terbatas (infinite loop) sehingga mikrokontroler terus membaca sensor selama catu daya menyala.', example: 'Do\n   \' Kode utama robot di sini\nLoop' },
+            { cmd: 'Wait / Waitms', cat: 'KONTROL', desc: 'Menunda eksekusi program dalam satuan detik (Wait) atau milidetik (Waitms).', example: 'Waitms 500 \' Tunda 0.5 detik' },
+            { cmd: 'Gosub ... Return', cat: 'KONTROL', desc: 'Memanggil sub-rutin fungsi terpisah (seperti sub-rutin Maju, Belok_kiri, Berhenti) agar kode rapi dan modular.', example: 'Gosub Belok_kiri\n...\nBelok_kiri:\n  Pwm1a = 60 : Pwm1b = 200\nReturn' }
+        ];
+
+        function filterDocs() {
+            const query = document.getElementById('doc-search').value.toLowerCase();
+            const cat = document.getElementById('doc-category').value;
+            const grid = document.getElementById('docs-grid');
+
+            const filtered = BASCOM_DOCS.filter(item => {
+                const matchCat = (cat === 'ALL' || item.cat === cat);
+                const matchQuery = item.cmd.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
+                return matchCat && matchQuery;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-10 text-slate-500 text-sm">Tidak ditemukan perintah yang cocok dengan pencarian "<strong>${query}</strong>".</div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map((item, idx) => `
+                <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 flex flex-col justify-between hover:border-sky-400 transition">
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <code class="font-mono font-bold text-sm text-sky-700 bg-sky-100/80 px-2.5 py-1 rounded-lg">${item.cmd}</code>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">${item.cat}</span>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed mb-3">${item.desc}</p>
+                    </div>
+                    <div class="bg-slate-900 rounded-xl p-3 relative group">
+                        <pre id="doc-ex-${idx}" class="font-mono text-xs text-emerald-300 overflow-x-auto">${item.example}</pre>
+                        <button onclick="copyCodeBlock('doc-ex-${idx}')" title="Salin contoh" class="absolute top-2 right-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded text-[10px] opacity-80 group-hover:opacity-100 transition">
+                            <i class="fa-regular fa-copy"></i> Salin
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        /* =====================================================================
+           7. SIMULATOR VIRTUAL ROBOT LINE FOLLOWER (CANVAS 2D REAL-TIME)
+           ===================================================================== */
+        let simRunning = true;
+        let simBaseSpeed = 170;
+        let simTurnSpeed = 140;
+        let robot = { x: 0, y: 0, angle: 0 };
+        let simCanvas, simCtx;
+
+        function resizeSimCanvas() {
+            const wrapper = document.getElementById('sim-canvas-wrapper');
+            simCanvas = document.getElementById('robot-sim-canvas');
+            if (!wrapper || !simCanvas) return;
+
+            const rect = wrapper.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return;
+
+            const wasUninitialized = (simCanvas.width === 300 && simCanvas.height === 150);
+            simCanvas.width = rect.width;
+            simCanvas.height = rect.height;
+            simCtx = simCanvas.getContext('2d');
+
+            if (wasUninitialized || (robot.x === 0 && robot.y === 0)) {
+                resetRobotSim();
+            }
+        }
+
+        function resetRobotSim() {
+            if (!simCanvas) return;
+            const cx = simCanvas.width / 2;
+            const cy = simCanvas.height / 2;
+            const ry = Math.min(simCanvas.height * 0.34, 125);
+            robot.x = cx;
+            robot.y = cy - ry;
+            robot.angle = 0; // Menghadap ke kanan sepanjang bagian atas lintasan oval
+        }
+
+        function toggleSimRunning() {
+            simRunning = !simRunning;
+            const btn = document.getElementById('sim-play-btn');
+            if (simRunning) {
+                btn.innerHTML = `<i class="fa-solid fa-pause"></i> <span>Jeda</span>`;
+                btn.className = "px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition";
+            } else {
+                btn.innerHTML = `<i class="fa-solid fa-play"></i> <span>Lanjut</span>`;
+                btn.className = "px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition";
+            }
+        }
+
+        function updateSimParams() {
+            simBaseSpeed = parseInt(document.getElementById('sim-base-speed').value);
+            simTurnSpeed = parseInt(document.getElementById('sim-turn-speed').value);
+            document.getElementById('sim-base-speed-val').textContent = `${simBaseSpeed} / 255`;
+            document.getElementById('sim-turn-speed-val').textContent = `${simTurnSpeed} / 255`;
+        }
+
+        function drawTrackAndSampleSensors() {
+            const w = simCanvas.width;
+            const h = simCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+            const rx = Math.min(w * 0.38, 230);
+            const ry = Math.min(h * 0.34, 125);
+
+            // Latar putih arena + grid teknik
+            simCtx.fillStyle = '#f8fafc';
+            simCtx.fillRect(0, 0, w, h);
+
+            simCtx.strokeStyle = '#e2e8f0';
+            simCtx.lineWidth = 1;
+            for (let gx = 0; gx < w; gx += 25) {
+                simCtx.beginPath(); simCtx.moveTo(gx, 0); simCtx.lineTo(gx, h); simCtx.stroke();
+            }
+            for (let gy = 0; gy < h; gy += 25) {
+                simCtx.beginPath(); simCtx.moveTo(0, gy); simCtx.lineTo(w, gy); simCtx.stroke();
+            }
+
+            // Garis hitam lintasan (Track Line Follower)
+            simCtx.strokeStyle = '#0f172a';
+            simCtx.lineWidth = 16;
+            simCtx.beginPath();
+            simCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+            simCtx.stroke();
+
+            // Hitung posisi 3 sensor di depan bodi robot
+            const sensorDist = 20;
+            const sensorSpread = 12;
+            const cosA = Math.cos(robot.angle);
+            const sinA = Math.sin(robot.angle);
+
+            const frontX = robot.x + cosA * sensorDist;
+            const frontY = robot.y + sinA * sensorDist;
+
+            // Vektor tegak lurus (kiri & kanan relatif terhadap arah hadap robot)
+            const leftVecX = sinA;
+            const leftVecY = -cosA;
+
+            const sLeftPos = { x: frontX + leftVecX * sensorSpread, y: frontY + leftVecY * sensorSpread };
+            const sCenterPos = { x: frontX, y: frontY };
+            const sRightPos = { x: frontX - leftVecX * sensorSpread, y: frontY - leftVecY * sensorSpread };
+
+            // Baca warna piksel tepat di bawah ketiga sensor (1 = hitam, 0 = putih)
+            const readPixelBlack = (pos) => {
+                const px = Math.max(0, Math.min(w - 1, Math.round(pos.x)));
+                const py = Math.max(0, Math.min(h - 1, Math.round(pos.y)));
+                const data = simCtx.getImageData(px, py, 1, 1).data;
+                return (data[0] < 80 && data[1] < 80 && data[2] < 80) ? 1 : 0;
+            };
+
+            const sL = readPixelBlack(sLeftPos);
+            const sC = readPixelBlack(sCenterPos);
+            const sR = readPixelBlack(sRightPos);
+
+            return { sL, sC, sR, sLeftPos, sCenterPos, sRightPos };
+        }
+
+        function stepRobotSimulation() {
+            if (simCanvas && simCtx && !document.getElementById('tab-simulator').classList.contains('hidden')) {
+                const { sL, sC, sR, sLeftPos, sCenterPos, sRightPos } = drawTrackAndSampleSensors();
+
+                // Logika kendali seperti di ATmega8535
+                let actionText = "MAJU LURUS";
+                let activeTrace = 1;
+                let leftPWM = simBaseSpeed;
+                let rightPWM = simBaseSpeed;
+
+                if (sL === 1 && sR === 0) {
+                    actionText = "BELOK KIRI (Koreksi Garis)";
+                    activeTrace = 2;
+                    leftPWM = simBaseSpeed * 0.25;
+                    rightPWM = simTurnSpeed;
+                } else if (sR === 1 && sL === 0) {
+                    actionText = "BELOK KANAN (Koreksi Garis)";
+                    activeTrace = 3;
+                    leftPWM = simTurnSpeed;
+                    rightPWM = simBaseSpeed * 0.25;
+                } else if (sC === 1) {
+                    actionText = "MAJU LURUS (On Track)";
+                    activeTrace = 1;
+                } else {
+                    actionText = "MENCARI GARIS...";
+                    activeTrace = 4;
+                }
+
+                if (simRunning) {
+                    const linearVel = ((leftPWM + rightPWM) / 2) * 0.014;
+                    const angularVel = ((leftPWM - rightPWM) / 255) * 0.095;
+                    robot.angle += angularVel;
+                    robot.x += Math.cos(robot.angle) * linearVel;
+                    robot.y += Math.sin(robot.angle) * linearVel;
+
+                    // Jaga agar robot tidak keluar dari batas canvas
+                    if (robot.x < 25 || robot.x > simCanvas.width - 25 || robot.y < 25 || robot.y > simCanvas.height - 25) {
+                        resetRobotSim();
+                    }
+                }
+
+                // Gambar bodi robot 2 roda (Differential Drive)
+                simCtx.save();
+                simCtx.translate(robot.x, robot.y);
+                simCtx.rotate(robot.angle);
+
+                // Roda kiri & kanan
+                simCtx.fillStyle = '#1e293b';
+                simCtx.fillRect(-10, -17, 16, 4);
+                simCtx.fillRect(-10, 13, 16, 4);
+
+                // Sasis Robot AVR
+                simCtx.fillStyle = '#0284c7';
+                simCtx.beginPath();
+                simCtx.roundRect(-14, -13, 28, 26, 6);
+                simCtx.fill();
+                simCtx.strokeStyle = '#0f172a';
+                simCtx.lineWidth = 2;
+                simCtx.stroke();
+
+                // Chip ATmega kecil di atas sasis
+                simCtx.fillStyle = '#0f172a';
+                simCtx.fillRect(-6, -6, 12, 12);
+                simCtx.restore();
+
+                // Gambar 3 titik sensor inframerah (Merah = deteksi garis hitam, Hijau = lantai putih)
+                [
+                    { pos: sLeftPos, val: sL },
+                    { pos: sCenterPos, val: sC },
+                    { pos: sRightPos, val: sR }
+                ].forEach(s => {
+                    simCtx.beginPath();
+                    simCtx.arc(s.pos.x, s.pos.y, 4.5, 0, Math.PI * 2);
+                    simCtx.fillStyle = s.val === 1 ? '#ef4444' : '#22c55e';
+                    simCtx.fill();
+                    simCtx.strokeStyle = '#ffffff';
+                    simCtx.lineWidth = 1.5;
+                    simCtx.stroke();
+                });
+
+                // Update UI readout
+                document.getElementById('sim-sl').textContent = sL;
+                document.getElementById('sim-sc').textContent = sC;
+                document.getElementById('sim-sr').textContent = sR;
+                document.getElementById('sim-action-label').textContent = actionText;
+
+                for (let i = 1; i <= 4; i++) {
+                    const lineEl = document.getElementById(`trace-line-${i}`);
+                    if (i === activeTrace) {
+                        lineEl.className = "px-2 py-1 rounded transition bg-sky-500/25 text-sky-300 font-bold border-l-2 border-sky-400";
+                    } else {
+                        lineEl.className = "px-2 py-1 rounded transition text-slate-400";
+                    }
+                }
+            }
+            requestAnimationFrame(stepRobotSimulation);
+        }
+
+        /* =====================================================================
+           8. ARENA 5 PERMAINAN PUZZLE EDUKATIF
+           ===================================================================== */
+        function selectPuzzleGame(pzNum) {
+            playSound('click');
+            document.querySelectorAll('.puzzle-panel').forEach(p => p.classList.add('hidden'));
+            document.getElementById(`puzzle-panel-${pzNum}`).classList.remove('hidden');
+
+            document.querySelectorAll('.pz-tab-btn').forEach(btn => {
+                if (parseInt(btn.dataset.pz) === pzNum) {
+                    btn.classList.add('border-sky-600', 'bg-sky-50', 'shadow-sm');
+                    btn.classList.remove('border-slate-200', 'bg-white');
+                } else {
+                    btn.classList.remove('border-sky-600', 'bg-sky-50', 'shadow-sm');
+                    btn.classList.add('border-slate-200', 'bg-white');
+                }
+            });
+        }
+
+        /* --- PUZZLE #1: SUSUN BLOK KODE BASCOM-AVR --- */
+        const PZ1_LEVELS = [
+            {
+                title: "Level 1: Struktur Dasar Kedip LED pada PortB.0",
+                desc: "Susun 6 baris program BASCOM-AVR berikut agar LED berkedip terus-menerus!",
+                hint: "Mulai dengan direktif $regfile dan $crystal, lalu Config Portb, baru masuk ke perulangan Do ... Loop.",
+                lines: [
+                    '$regfile = "m8535.dat"',
+                    '$crystal = 16000000',
+                    'Config Portb = Output',
+                    'Do',
+                    '   Toggle Portb.0 : Waitms 500',
+                    'Loop'
+                ]
+            },
+            {
+                title: "Level 2: Pembacaan Sensor Garis Analog (ADC0)",
+                desc: "Urutkan inisialisasi ADC dan pembacaan sensor pada kanal 0!",
+                hint: "Konfigurasi ADC dulu dengan Config Adc, aktifkan dengan Start Adc, lalu baca dengan Getadc(0) di dalam Do-Loop.",
+                lines: [
+                    '$regfile = "m8535.dat"',
+                    'Config Adc = Single , Prescaler = Auto , Reference = Avcc',
+                    'Start Adc',
+                    'Dim Sensor As Word',
+                    'Do',
+                    '   Sensor = Getadc(0)',
+                    'Loop'
+                ]
+            },
+            {
+                title: "Level 3: Kendali Kecepatan Motor DC dengan PWM Timer1",
+                desc: "Susun kode pembangkit sinyal PWM 8-bit untuk menjalankan motor pada kecepatan 200!",
+                hint: "Timer1 harus dikonfigurasi sebagai PWM sebelum nilai Pwm1a dan Pwm1b diisi.",
+                lines: [
+                    '$regfile = "m8535.dat"',
+                    '$crystal = 16000000',
+                    'Config Timer1 = Pwm , Pwm = 8 , Compare A Pwm = Clear Up , Prescale = 64',
+                    'Config Portb = Output',
+                    'Portb = &B00001010',
+                    'Pwm1a = 200'
+                ]
+            },
+            {
+                title: "Level 4: Logika Percabangan Belok Robot Line Follower",
+                desc: "Susun blok percabangan If-Then-Else-End If untuk belok kiri saat sensor kiri mendeteksi garis hitam!",
+                hint: "Struktur percabangan selalu diawali If ... Then, diikuti cabang alternatif Else, dan ditutup End If.",
+                lines: [
+                    'Do',
+                    '   If Pina.0 = 1 Then',
+                    '      Pwm1a = 50 : Pwm1b = 200',
+                    '   Else',
+                    '      Pwm1a = 180 : Pwm1b = 180',
+                    '   End If',
+                    'Loop'
+                ]
+            }
+        ];
+
+        let pz1CurrentLevel = 0;
+        let pz1BankItems = [];
+        let pz1TargetItems = [];
+
+        function initPz1Level(lvlIdx) {
+            pz1CurrentLevel = lvlIdx;
+            const lvl = PZ1_LEVELS[lvlIdx];
+            document.getElementById('pz1-title').textContent = lvl.title;
+            document.getElementById('pz1-desc').textContent = lvl.desc;
+            document.getElementById('pz1-level-indicator').textContent = `Level ${lvlIdx + 1} / ${PZ1_LEVELS.length}`;
+
+            // Acak urutan baris kode untuk bank
+            pz1BankItems = lvl.lines.map((code, idx) => ({ id: idx, code }));
+            for (let i = pz1BankItems.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pz1BankItems[i], pz1BankItems[j]] = [pz1BankItems[j], pz1BankItems[i]];
+            }
+            pz1TargetItems = [];
+            renderPz1Boards();
+        }
+
+        function resetPz1Level() {
+            playSound('click');
+            initPz1Level(pz1CurrentLevel);
+        }
+
+        function renderPz1Boards() {
+            const bankEl = document.getElementById('pz1-bank');
+            const targetEl = document.getElementById('pz1-target');
+
+            bankEl.innerHTML = pz1BankItems.map(item => `
+                <button onclick="movePz1ToTarget(${item.id})" class="w-full text-left font-mono text-xs bg-white hover:bg-sky-50 border border-slate-300 hover:border-sky-500 px-3.5 py-2.5 rounded-xl shadow-sm transition flex items-center justify-between gap-2">
+                    <span class="text-slate-800 font-semibold">${item.code}</span>
+                    <i class="fa-solid fa-arrow-right text-sky-500 text-xs"></i>
+                </button>
+            `).join('');
+
+            if (pz1TargetItems.length === 0) {
+                targetEl.innerHTML = `<div class="h-44 border-2 border-dashed border-slate-700 rounded-xl flex items-center justify-center text-xs text-slate-500 font-mono">Klik blok kode di kiri untuk menyusun di sini...</div>`;
+            } else {
+                targetEl.innerHTML = pz1TargetItems.map((item, idx) => `
+                    <button onclick="movePz1ToBank(${item.id})" class="w-full text-left font-mono text-xs bg-slate-800 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-500 px-3.5 py-2.5 rounded-xl transition flex items-center justify-between gap-2">
+                        <span class="flex items-center gap-2.5">
+                            <span class="text-slate-500 select-none">${idx + 1}.</span>
+                            <span class="text-emerald-300 font-semibold">${item.code}</span>
+                        </span>
+                        <i class="fa-solid fa-xmark text-slate-500 hover:text-rose-400"></i>
+                    </button>
+                `).join('');
+            }
+        }
+
+        function movePz1ToTarget(id) {
+            playSound('snap');
+            const idx = pz1BankItems.findIndex(x => x.id === id);
+            if (idx > -1) {
+                const [item] = pz1BankItems.splice(idx, 1);
+                pz1TargetItems.push(item);
+                renderPz1Boards();
+            }
+        }
+
+        function movePz1ToBank(id) {
+            playSound('click');
+            const idx = pz1TargetItems.findIndex(x => x.id === id);
+            if (idx > -1) {
+                const [item] = pz1TargetItems.splice(idx, 1);
+                pz1BankItems.push(item);
+                renderPz1Boards();
+            }
+        }
+
+        function showPz1Hint() {
+            playSound('click');
+            showToast(PZ1_LEVELS[pz1CurrentLevel].hint, "warning");
+        }
+
+        function checkPz1Solution() {
+            const lvl = PZ1_LEVELS[pz1CurrentLevel];
+            if (pz1TargetItems.length < lvl.lines.length) {
+                playSound('error');
+                showToast("Masih ada potongan kode di Bank yang belum dipasang!", "warning");
+                return;
+            }
+            const isCorrect = pz1TargetItems.every((item, idx) => item.code === lvl.lines[idx]);
+            if (isCorrect) {
+                if (pz1CurrentLevel < PZ1_LEVELS.length - 1) {
+                    playSound('success');
+                    showToast(`Benar! Lanjut ke Level ${pz1CurrentLevel + 2}...`, "success");
+                    initPz1Level(pz1CurrentLevel + 1);
+                } else {
+                    awardXP(100, 1);
+                    initPz1Level(0);
+                }
+            } else {
+                playSound('error');
+                showToast("Urutan sintaks belum tepat. Periksa kembali alur header, konfigurasi, dan loop!", "error");
+            }
+        }
+
+        /* --- PUZZLE #2: RAKIT PINOUT ATMEGA8535 --- */
+        const PZ2_MISSIONS = [
+            { targetPin: 19, text: "Hubungkan sinyal PWM Motor Kiri (OC1A) dari pin ENA Driver L298N!", hint: "OC1A berada pada Port D Bit 5 (Pin 19)." },
+            { targetPin: 40, text: "Hubungkan Sensor Garis Inframerah #1 ke saluran analog ADC0!", hint: "ADC0 adalah pin pertama Port A (Pin 40 di pojok kanan atas)." },
+            { targetPin: 9, text: "Hubungkan tombol Push-Button RESET agar sistem dapat di-restart!", hint: "Pin RESET berada tepat di bawah PB7 pada sisi kiri (Pin 9)." },
+            { targetPin: 14, text: "Hubungkan pin TX modul Bluetooth HC-05 ke jalur penerima serial RXD mikrokontroler!", hint: "RXD terletak pada Port D Bit 0 (Pin 14)." },
+            { targetPin: 18, text: "Hubungkan sinyal PWM Motor Kanan (OC1B) ke pin ENB Driver L298N!", hint: "OC1B berada pada Port D Bit 4 (Pin 18)." },
+            { targetPin: 30, text: "Berikan catu daya +5V ke pin AVCC agar modul pembacaan sensor ADC aktif!", hint: "AVCC berada di sisi kanan bawah tepat di bawah PA7 (Pin 30)." }
+        ];
+
+        let pz2Index = 0;
+        let pz2Score = 0;
+
+        function initPz2() {
+            pz2Index = 0;
+            pz2Score = 0;
+            renderChipDiagram('pz2-chip-board', 'handlePz2PinClick');
+            updatePz2UI();
+        }
+
+        function updatePz2UI() {
+            const m = PZ2_MISSIONS[pz2Index];
+            document.getElementById('pz2-progress').textContent = `Misi ${pz2Index + 1} / ${PZ2_MISSIONS.length}`;
+            document.getElementById('pz2-mission-text').textContent = m.text;
+            document.getElementById('pz2-mission-hint').textContent = `Petunjuk: ${m.hint}`;
+            document.getElementById('pz2-score').textContent = `${pz2Score} / ${PZ2_MISSIONS.length}`;
+        }
+
+        function handlePz2PinClick(pinNum) {
+            const m = PZ2_MISSIONS[pz2Index];
+            const clickedPinObj = ATMEGA8535_PINS.find(p => p.num === pinNum);
+
+            if (pinNum === m.targetPin) {
+                pz2Score++;
+                if (pz2Index < PZ2_MISSIONS.length - 1) {
+                    playSound('success');
+                    showToast(`Tepat sekali! Pin ${pinNum} (${clickedPinObj.name}) terhubung!`, "success");
+                    pz2Index++;
+                    updatePz2UI();
+                } else {
+                    awardXP(100, 2);
+                    initPz2();
+                }
+            } else {
+                playSound('error');
+                showToast(`Kurang tepat! Kamu menekan Pin ${pinNum} (${clickedPinObj.name}). Coba lagi!`, "error");
+            }
+        }
+
+        /* --- PUZZLE #3: SAKLAR REGISTER 8-BIT (BINER & HEX) --- */
+        const PZ3_CHALLENGES = [
+            {
+                prompt: 'Atur register <code class="text-sky-700">DDRA</code> agar 4 pin bawah (<code class="text-sky-700">PA0..PA3</code>) menjadi <strong>INPUT (0)</strong> untuk sensor garis, dan 4 pin atas (<code class="text-sky-700">PA4..PA7</code>) menjadi <strong>OUTPUT (1)</strong> untuk LED!',
+                targetMask: 0b11110000
+            },
+            {
+                prompt: 'Nyalakan hanya <strong>4 LED bagian bawah</strong> (<code class="text-sky-700">PB0..PB3 = 1</code>) dan matikan 4 LED atas (<code class="text-sky-700">PB4..PB7 = 0</code>) pada register <code class="text-sky-700">PORTB</code> (Hex: &amp;H0F)!',
+                targetMask: 0b00001111
+            },
+            {
+                prompt: 'Jalankan kedua motor maju pada Driver L298N dengan mengisi <code class="text-sky-700">PORTB = &amp;B00001010</code> (Bit 3 dan Bit 1 bernilai 1)!',
+                targetMask: 0b00001010
+            },
+            {
+                prompt: 'Aktifkan seluruh <strong>Internal Pull-Up Resistor</strong> pada <code class="text-sky-700">PORTA</code> dengan membuat semua 8 bit bernilai <strong>1</strong> (&amp;HFF)!',
+                targetMask: 0b11111111
+            },
+            {
+                prompt: 'Buat pola lampu strobo selang-seling pada <code class="text-sky-700">PORTB</code> dengan nilai Hexadecimal <code class="text-sky-700">&amp;HAA</code> (Bit ganjil = 1, Bit genap = 0)!',
+                targetMask: 0b10101010
+            }
+        ];
+
+        let pz3Index = 0;
+        let pz3Bits = [0, 0, 0, 0, 0, 0, 0, 0]; // index 0 = Bit 7 (MSB), index 7 = Bit 0 (LSB)
+
+        function initPz3(idx = 0) {
+            pz3Index = idx;
+            pz3Bits = [0, 0, 0, 0, 0, 0, 0, 0];
+            document.getElementById('pz3-level').textContent = `Tantangan ${pz3Index + 1} / ${PZ3_CHALLENGES.length}`;
+            document.getElementById('pz3-prompt').innerHTML = PZ3_CHALLENGES[pz3Index].prompt;
+            renderPz3Switches();
+        }
+
+        function renderPz3Switches() {
+            const container = document.getElementById('pz3-bit-switches');
+            container.innerHTML = pz3Bits.map((val, i) => {
+                const bitNumber = 7 - i;
+                const activeClass = val === 1
+                    ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-lg shadow-emerald-500/15'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500';
+                const ledDot = val === 1 ? 'bg-emerald-400 shadow-sm shadow-emerald-400' : 'bg-slate-600';
+
+                return `
+                    <button type="button" onclick="togglePz3Bit(${i})" class="p-3 rounded-2xl border-2 ${activeClass} flex flex-col items-center justify-between gap-2 transition">
+                        <span class="text-[10px] font-mono uppercase">Bit ${bitNumber}</span>
+                        <div class="w-3.5 h-3.5 rounded-full ${ledDot}"></div>
+                        <span class="font-mono text-xl font-extrabold">${val}</span>
+                    </button>
+                `;
+            }).join('');
+
+            const binStr = pz3Bits.join('');
+            const decVal = parseInt(binStr, 2);
+            const hexStr = decVal.toString(16).toUpperCase().padStart(2, '0');
+
+            document.getElementById('pz3-bin-out').textContent = `&B${binStr}`;
+            document.getElementById('pz3-hex-out').textContent = `&H${hexStr}`;
+            document.getElementById('pz3-dec-out').textContent = decVal;
+        }
+
+        function togglePz3Bit(idx) {
+            playSound('snap');
+            pz3Bits[idx] = pz3Bits[idx] === 1 ? 0 : 1;
+            renderPz3Switches();
+        }
+
+        function checkPz3Solution() {
+            const currentVal = parseInt(pz3Bits.join(''), 2);
+            const targetVal = PZ3_CHALLENGES[pz3Index].targetMask;
+
+            if (currentVal === targetVal) {
+                if (pz3Index < PZ3_CHALLENGES.length - 1) {
+                    playSound('success');
+                    showToast("Konfigurasi register 8-bit tepat! Lanjut tantangan berikutnya.", "success");
+                    initPz3(pz3Index + 1);
+                } else {
+                    awardXP(100, 3);
+                    initPz3(0);
+                }
+            } else {
+                playSound('error');
+                showToast("Nilai register belum sesuai dengan spesifikasi bit yang diminta!", "error");
+            }
+        }
+
+        /* --- PUZZLE #4: LOGIKA JALUR ROBOT LINE FOLLOWER --- */
+        const PZ4_CASES = [
+            {
+                sensors: [1, 0, 0], // [Kiri, Tengah, Kanan] -> Garis ada di bawah sensor kiri
+                readout: "PINA = &B00000100 (Sensor Kiri = 1)",
+                condCode: "If Pina.2 = 1 Then ' Garis berada di sisi KIRI robot",
+                ansLeft: "STOP",
+                ansRight: "MAJU",
+                ansCode: "BELOK_KIRI",
+                explain: "Agar robot berbelok ke kiri mengikuti garis, roda kiri harus melambat/berhenti dan roda kanan berputar maju!"
+            },
+            {
+                sensors: [0, 1, 0], // Garis tepat di tengah
+                readout: "PINA = &B00000010 (Sensor Tengah = 1)",
+                condCode: "If Pina.1 = 1 Then ' Garis tepat di TENGAH robot",
+                ansLeft: "MAJU",
+                ansRight: "MAJU",
+                ansCode: "MAJU_LURUS",
+                explain: "Saat garis berada tepat di sensor tengah, kedua motor kiri dan kanan berputar maju dengan kecepatan seimbang."
+            },
+            {
+                sensors: [0, 0, 1], // Garis ada di bawah sensor kanan
+                readout: "PINA = &B00000001 (Sensor Kanan = 1)",
+                condCode: "If Pina.0 = 1 Then ' Garis berada di sisi KANAN robot",
+                ansLeft: "MAJU",
+                ansRight: "STOP",
+                ansCode: "BELOK_KANAN",
+                explain: "Agar robot berbelok ke kanan, roda kiri tetap maju mendorong dan roda kanan berhenti/melambat."
+            },
+            {
+                sensors: [1, 1, 1], // Garis melintang penuh (Garis Finish)
+                readout: "PINA = &B00000111 (Semua Sensor = 1 / Garis Finish)",
+                condCode: "If Pina = &B00000111 Then ' Robot mencapai garis FINISH",
+                ansLeft: "STOP",
+                ansRight: "STOP",
+                ansCode: "REM_STOP",
+                explain: "Saat ketiga sensor mendeteksi garis finish melintang penuh, kedua motor dihentikan (PWM = 0)."
+            }
+        ];
+
+        let pz4Index = 0;
+
+        function initPz4(idx = 0) {
+            pz4Index = idx;
+            const c = PZ4_CASES[pz4Index];
+            document.getElementById('pz4-stage').textContent = `Kasus ${pz4Index + 1} / ${PZ4_CASES.length}`;
+            document.getElementById('pz4-sensor-readout').textContent = c.readout;
+            document.getElementById('pz4-code-cond').textContent = c.condCode;
+            document.getElementById('pz4-left-motor').value = "";
+            document.getElementById('pz4-right-motor').value = "";
+            document.getElementById('pz4-code-choice').value = "";
+
+            // Render visual garis hitam dan posisi 3 sensor
+            const vis = document.getElementById('pz4-track-visual');
+            let lineHtml = '';
+            if (c.sensors[0] === 1 && c.sensors[2] === 1) {
+                // Garis horizontal finish
+                lineHtml = `<div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-8 bg-slate-900"></div>`;
+            } else if (c.sensors[0] === 1) {
+                // Garis serong ke kiri atas
+                lineHtml = `<div class="w-8 h-64 bg-slate-900 -rotate-25 -translate-x-10"></div>`;
+            } else if (c.sensors[2] === 1) {
+                // Garis serong ke kanan atas
+                lineHtml = `<div class="w-8 h-64 bg-slate-900 rotate-25 translate-x-10"></div>`;
+            } else {
+                // Garis vertikal lurus di tengah
+                lineHtml = `<div class="w-8 h-64 bg-slate-900"></div>`;
+            }
+
+            const sensorBadges = ['KIRI', 'TENGAH', 'KANAN'].map((label, i) => {
+                const active = c.sensors[i] === 1;
+                return `
+                    <div class="flex flex-col items-center z-10">
+                        <div class="w-6 h-6 rounded-full border-2 border-white shadow-md flex items-center justify-center font-mono text-xs font-extrabold ${active ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}">
+                            ${c.sensors[i]}
+                        </div>
+                        <span class="text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded bg-slate-900/80 text-white">${label}</span>
+                    </div>
+                `;
+            }).join('');
+
+            vis.innerHTML = `${lineHtml}<div class="flex items-center justify-between w-40 z-10">${sensorBadges}</div>`;
+        }
+
+        function checkPz4Solution() {
+            const c = PZ4_CASES[pz4Index];
+            const lVal = document.getElementById('pz4-left-motor').value;
+            const rVal = document.getElementById('pz4-right-motor').value;
+            const codeVal = document.getElementById('pz4-code-choice').value;
+
+            if (!lVal || !rVal || !codeVal) {
+                playSound('warning');
+                showToast("Lengkapi pilihan Motor Kiri, Motor Kanan, dan Perintah BASCOM terlebih dahulu!", "warning");
+                return;
+            }
+
+            if (lVal === c.ansLeft && rVal === c.ansRight && codeVal === c.ansCode) {
+                if (pz4Index < PZ4_CASES.length - 1) {
+                    playSound('success');
+                    showToast(`Analisis tepat! ${c.explain}`, "success");
+                    initPz4(pz4Index + 1);
+                } else {
+                    awardXP(100, 4);
+                    initPz4(0);
+                }
+            } else {
+                playSound('error');
+                showToast("Logika belok masih keliru—robot akan keluar jalur! Perhatikan posisi garis hitam.", "error");
+            }
+        }
+
+        /* --- PUZZLE #5: TEKA-TEKI SILANG (TTS) ELEKTRONIKA & BASCOM-AVR --- */
+        // Grid 10x10 yang telah diverifikasi persilangannya secara akurat
+        const CW_WORDS = [
+            { num: 1, dir: 'across', row: 1, col: 1, answer: 'REGFILE', clue: '1. Direktif BASCOM untuk memilih file definisi IC ($... = "m8535.dat")' },
+            { num: 2, dir: 'down',   row: 1, col: 1, answer: 'RESET',   clue: '2. Pin nomor 9 ATmega8535 untuk me-restart program dari awal' },
+            { num: 3, dir: 'down',   row: 1, col: 4, answer: 'FLASH',   clue: '3. Memori permanen 8 KB tempat menyimpan kode program AVR' },
+            { num: 4, dir: 'across', row: 3, col: 0, answer: 'CRYSTAL', clue: '4. Komponen pembangkit detak frekuensi osilator eksternal (16 MHz)' },
+            { num: 5, dir: 'down',   row: 3, col: 6, answer: 'LOOP',    clue: '5. Pasangan penutup perulangan abadi dari perintah Do' },
+            { num: 6, dir: 'across', row: 5, col: 1, answer: 'PORTA',   clue: '6. Register I/O yang memiliki fitur terintegrasi 8 kanal ADC' },
+            { num: 7, dir: 'down',   row: 5, col: 3, answer: 'TIMER',   clue: '7. Periferal internal ATmega8535 pembangkit sinyal PWM' },
+            { num: 8, dir: 'across', row: 7, col: 2, answer: 'GETADC',  clue: '8. Fungsi BASCOM-AVR untuk membaca tegangan sensor analog' },
+            { num: 9, dir: 'across', row: 9, col: 2, answer: 'DRIVER',  clue: '9. Rangkaian penguat arus motor DC seperti IC L298N' }
+        ];
+
+        let cwSolutionGrid = Array.from({ length: 10 }, () => Array(10).fill(null));
+        let cwNumberGrid = Array.from({ length: 10 }, () => Array(10).fill(null));
+
+        function initCrossword() {
+            cwSolutionGrid = Array.from({ length: 10 }, () => Array(10).fill(null));
+            cwNumberGrid = Array.from({ length: 10 }, () => Array(10).fill(null));
+
+            CW_WORDS.forEach(w => {
+                cwNumberGrid[w.row][w.col] = w.num;
+                for (let i = 0; i < w.answer.length; i++) {
+                    const r = w.dir === 'across' ? w.row : w.row + i;
+                    const c = w.dir === 'across' ? w.col + i : w.col;
+                    cwSolutionGrid[r][c] = w.answer[i];
+                }
+            });
+
+            const gridEl = document.getElementById('crossword-grid');
+            let cellsHtml = '';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 10; c++) {
+                    const letter = cwSolutionGrid[r][c];
+                    const num = cwNumberGrid[r][c];
+                    if (letter) {
+                        cellsHtml += `
+                            <div class="relative bg-white rounded-md overflow-hidden shadow-sm">
+                                ${num ? `<span class="absolute top-0.5 left-1 text-[9px] font-bold text-slate-500 leading-none pointer-events-none">${num}</span>` : ''}
+                                <input type="text" maxlength="1" data-r="${r}" data-c="${c}"
+                                    oninput="handleCwInput(this, ${r}, ${c})"
+                                    class="cw-cell w-full h-full text-center font-mono font-extrabold text-sm sm:text-base text-slate-900 bg-transparent pt-1">
+                            </div>`;
+                    } else {
+                        cellsHtml += `<div class="bg-slate-800/60 rounded-md"></div>`;
+                    }
+                }
+            }
+            gridEl.innerHTML = cellsHtml;
+
+            // Render petunjuk mendatar & menurun
+            document.getElementById('cw-clues-across').innerHTML = CW_WORDS.filter(w => w.dir === 'across')
+                .map(w => `<li><strong>${w.clue.split('.')[0]}.</strong> ${w.clue.split('. ')[1]} <span class="text-slate-400 font-mono">(${w.answer.length} huruf)</span></li>`).join('');
+            document.getElementById('cw-clues-down').innerHTML = CW_WORDS.filter(w => w.dir === 'down')
+                .map(w => `<li><strong>${w.clue.split('.')[0]}.</strong> ${w.clue.split('. ')[1]} <span class="text-slate-400 font-mono">(${w.answer.length} huruf)</span></li>`).join('');
+        }
+
+        function handleCwInput(inputEl, r, c) {
+            inputEl.value = inputEl.value.toUpperCase().replace(/[^A-Z]/g, '');
+            inputEl.parentElement.classList.remove('bg-emerald-100', 'bg-rose-100');
+            if (inputEl.value.length === 1) {
+                playSound('click');
+                // Pindah fokus otomatis ke kotak sebelah kanan atau bawah yang tersedia
+                const nextRight = document.querySelector(`.cw-cell[data-r="${r}"][data-c="${c + 1}"]`);
+                const nextDown = document.querySelector(`.cw-cell[data-r="${r + 1}"][data-c="${c}"]`);
+                if (nextRight && !nextRight.value) nextRight.focus();
+                else if (nextDown && !nextDown.value) nextDown.focus();
+            }
+        }
+
+        function revealCrosswordHint() {
+            const inputs = Array.from(document.querySelectorAll('.cw-cell'));
+            const emptyOrWrong = inputs.filter(inp => {
+                const r = parseInt(inp.dataset.r);
+                const c = parseInt(inp.dataset.c);
+                return inp.value.toUpperCase() !== cwSolutionGrid[r][c];
+            });
+
+            if (emptyOrWrong.length === 0) {
+                showToast("Semua kotak TTS sudah terisi dengan benar!", "success");
+                return;
+            }
+            const pick = emptyOrWrong[Math.floor(Math.random() * emptyOrWrong.length)];
+            const r = parseInt(pick.dataset.r);
+            const c = parseInt(pick.dataset.c);
+            pick.value = cwSolutionGrid[r][c];
+            pick.parentElement.classList.add('bg-amber-100');
+            playSound('snap');
+            showToast(`Bantuan huruf "${cwSolutionGrid[r][c]}" dibuka!`, "info");
+        }
+
+        function checkCrossword() {
+            const inputs = Array.from(document.querySelectorAll('.cw-cell'));
+            let allCorrect = true;
+            let filledCount = 0;
+
+            inputs.forEach(inp => {
+                const r = parseInt(inp.dataset.r);
+                const c = parseInt(inp.dataset.c);
+                const val = inp.value.toUpperCase();
+                inp.parentElement.classList.remove('bg-emerald-100', 'bg-rose-100', 'bg-amber-100');
+
+                if (val) filledCount++;
+                if (val === cwSolutionGrid[r][c]) {
+                    inp.parentElement.classList.add('bg-emerald-100');
+                } else {
+                    allCorrect = false;
+                    if (val) inp.parentElement.classList.add('bg-rose-100');
+                }
+            });
+
+            if (filledCount === 0) {
+                playSound('warning');
+                showToast("Klik kotak putih pada papan TTS dan ketik jawabanmu!", "warning");
+                return;
+            }
+
+            if (allCorrect) {
+                awardXP(100, 5);
+            } else {
+                playSound('error');
+                showToast("Kotak hijau sudah benar, perbaiki kotak merah atau kotak kosong!", "warning");
+            }
+        }
+
+        /* =====================================================================
+           9. INISIALISASI SAAT HALAMAN SELESAI DIMUAT
+           ===================================================================== */
+        window.addEventListener('load', () => {
+            loadState();
+            renderChipDiagram('interactive-chip-container', 'inspectTheoryPin');
+            filterDocs();
+            initPz1Level(0);
+            initPz2();
+            initPz3(0);
+            initPz4(0);
+            initCrossword();
+
+            resizeSimCanvas();
+            window.addEventListener('resize', resizeSimCanvas);
+            requestAnimationFrame(stepRobotSimulation);
+        });
+    </script>
+</body>
+</html>
